@@ -1,7 +1,7 @@
 # TinyCursor 🚀
 > High-performance native desktop smooth cursor engine with critically damped spring dynamics, real-time refresh rate synchronization, and 14 adaptive dual-theme designs. Built in 100% pure native Rust.
 
-[![CI](https://github.com/rafy2/TinyCursor/actions/workflows/ci.yml/badge.svg)](https://github.com/rafy2/TinyCursor/actions/workflows/ci.yml)
+[![CI](https://github.com/bm0x/TinyCursor/actions/workflows/ci.yml/badge.svg)](https://github.com/bm0x/TinyCursor/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011%20(64--bit)-lightgrey.svg)]()
 [![Rust](https://img.shields.io/badge/Rust-2021%20Edition-orange.svg)]()
@@ -37,7 +37,7 @@ Website: **[https://tinycursor.vercel.app](https://tinycursor.vercel.app)**
 ## 📦 Installation
 
 ### Option 1: Automated Windows Installer (.exe)
-Download the latest `TinyCursor-Setup-x64.exe` from [GitHub Releases](https://github.com/rafy2/TinyCursor/releases/latest).
+Download the latest `TinyCursor-Setup-x64.exe` from [GitHub Releases](https://github.com/bm0x/TinyCursor/releases/latest).
 The Inno Setup wizard installs TinyCursor in `C:\Program Files\TinyCursor` with optional auto-start on Windows boot.
 
 ### Option 2: Portable (.zip)
@@ -46,7 +46,7 @@ Download `TinyCursor-Portable-x64.zip`, extract anywhere, and run `tiny-cursor.e
 ### Option 3: Build from Source
 ```bash
 # Clone the repository
-git clone https://github.com/rafy2/TinyCursor.git
+git clone https://github.com/bm0x/TinyCursor.git
 cd TinyCursor
 
 # Run unit tests

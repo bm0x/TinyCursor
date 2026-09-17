@@ -128,6 +128,8 @@ pub const WS_EX_TRANSPARENT: u32 = 0x00000020;
 pub const WS_EX_LAYERED: u32 = 0x00080000;
 pub const WS_EX_TOOLWINDOW: u32 = 0x00000080;
 pub const WS_EX_NOACTIVATE: u32 = 0x08000000;
+pub const GWL_STYLE: i32 = -16;
+pub const WS_THICKFRAME: u32 = 0x00040000;
 
 // SetWindowPos Constants
 pub const HWND_TOPMOST: HWND = -1isize as *mut c_void;
@@ -209,6 +211,8 @@ extern "system" {
         lpdw_result: *mut usize,
     ) -> LRESULT;
     pub fn GetClassNameW(h_wnd: HWND, lp_class_name: *mut u16, n_max_count: i32) -> i32;
+    pub fn GetWindowRect(h_wnd: HWND, lp_rect: *mut RECT) -> BOOL;
+    pub fn GetWindowLongW(h_wnd: HWND, n_index: i32) -> i32;
     pub fn GetCursorInfo(pci: *mut CURSORINFO) -> BOOL;
     pub fn GetAsyncKeyState(v_key: i32) -> i16;
     pub fn CreateWindowExW(

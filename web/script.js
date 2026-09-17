@@ -51,7 +51,7 @@
         cursorEl.style.display = 'block';
       }
 
-      // Detect interactive elements (links, buttons, inputs)
+      // Detect interactive elements and surface luminance passively
       const target = e.target;
       isHoveringInteractive = !!(
         target &&
@@ -62,6 +62,7 @@
           target.closest('.test-btn') ||
           target.getAttribute('role') === 'button')
       );
+      isOverLightSurface = !!(target && target.closest('.test-light'));
     },
     { passive: true }
   );
@@ -127,12 +128,7 @@
       // Apply GPU-accelerated 3D Transform
       cursorEl.style.transform = `translate3d(${posX + offsetX}px, ${posY + offsetY}px, 0) rotate(${currentAngle}deg) scale(${scale})`;
 
-      // 4. Sample background contrast dynamically
-      const elUnder = document.elementFromPoint(posX, posY);
-      const wasLight = isOverLightSurface;
-      isOverLightSurface = !!(elUnder && elUnder.closest('.test-light'));
-
-      // 5. Update sprite source based on contrast and interactive state
+      // 4. Update sprite source based on contrast and interactive state
       const targetSrc = isOverLightSurface
         ? isHoveringInteractive
           ? 'assets/cursor_hand_black.png'

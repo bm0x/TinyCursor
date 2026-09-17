@@ -5,9 +5,8 @@ use crate::core::math::Vec2;
 use super::renderer::RenderCursorKind;
 use super::sys::{
     GetAsyncKeyState, GetClassNameW, GetCursorPos, GetDC, GetDeviceCaps, GetPixel,
-    ReleaseDC, SendMessageTimeoutW, WindowFromPoint, CLR_INVALID, POINT,
-    SMTO_ABORTIFHUNG, VK_CONTROL, VK_ESCAPE, VK_LBUTTON, VK_SHIFT, VREFRESH,
-    WM_NCHITTEST,
+    GetWindowLongW, GetWindowRect, ReleaseDC, WindowFromPoint, CLR_INVALID, GWL_STYLE,
+    POINT, RECT, VK_CONTROL, VK_ESCAPE, VK_LBUTTON, VK_SHIFT, VREFRESH, WS_THICKFRAME,
 };
 
 /// Queries the real hardware mouse cursor position in virtual screen coordinates.
@@ -105,7 +104,8 @@ pub fn get_max_display_frequency() -> u32 {
     }
 }
 
-/// Detects the active system cursor design based on Hit Testing and window inspection.
+/// Detects the active system cursor design using zero-message geometry and class detection.
+/// Never sends cross-process window messages (preventing WinUI / Microsoft Store memory recursion & lag).
 pub fn detect_system_cursor(pos: Vec2, is_clicking: bool, is_hand_on_click: bool) -> RenderCursorKind {
     let pt = POINT {
         x: pos.x as i32,
@@ -115,35 +115,32 @@ pub fn detect_system_cursor(pos: Vec2, is_clicking: bool, is_hand_on_click: bool
     unsafe {
         let hwnd = WindowFromPoint(pt);
         if !hwnd.is_null() {
-            let lparam = ((pt.y as isize) << 16) | ((pt.x as isize) & 0xFFFF);
-            let mut ht_result: usize = 0;
-            let ok = SendMessageTimeoutW(
-                hwnd,
-                WM_NCHITTEST,
-                0,
-                lparam,
-                SMTO_ABORTIFHUNG,
-                2,
-                &mut ht_result,
-            );
+            let style = GetWindowLongW(hwnd, GWL_STYLE) as u32;
+            // Only resizable windows have resize borders
+            if (style & WS_THICKFRAME) != 0 {
+                let mut rect = RECT::default();
+                if GetWindowRect(hwnd, &mut rect) != 0 {
+                    const BORDER: i32 = 8;
+                    let on_left = (pt.x - rect.left).abs() <= BORDER;
+                    let on_right = (rect.right - pt.x).abs() <= BORDER;
+                    let on_top = (pt.y - rect.top).abs() <= BORDER;
+                    let on_bottom = (rect.bottom - pt.y).abs() <= BORDER;
 
-            if ok != 0 {
-                match ht_result {
-                    10 | 11 => return RenderCursorKind::ResizeWE,
-                    12 | 15 => return RenderCursorKind::ResizeNS,
-                    13 | 17 => return RenderCursorKind::ResizeNWSE,
-                    14 | 16 => return RenderCursorKind::ResizeNESW,
-                    2 if is_clicking => return RenderCursorKind::Move,
-                    _ => {}
+                    if on_top && on_left { return RenderCursorKind::ResizeNWSE; }
+                    if on_top && on_right { return RenderCursorKind::ResizeNESW; }
+                    if on_bottom && on_left { return RenderCursorKind::ResizeNESW; }
+                    if on_bottom && on_right { return RenderCursorKind::ResizeNWSE; }
+                    if on_left || on_right { return RenderCursorKind::ResizeWE; }
+                    if on_top || on_bottom { return RenderCursorKind::ResizeNS; }
                 }
             }
 
-            let mut class_buf = [0u16; 64];
+            let mut class_buf = [0u16; 32];
             let len = GetClassNameW(hwnd, class_buf.as_mut_ptr(), class_buf.len() as i32);
             if len > 0 {
                 let class_str = String::from_utf16_lossy(&class_buf[..len as usize]);
                 let lower = class_str.to_ascii_lowercase();
-                if lower.contains("edit") || lower.contains("textbox") || lower.contains("scintilla") || lower.contains("text") {
+                if lower.contains("edit") || lower.contains("textbox") || lower.contains("scintilla") {
                     return RenderCursorKind::IBeam;
                 }
             }

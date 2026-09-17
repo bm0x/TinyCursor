@@ -99,6 +99,7 @@ fn run_windows() {
 
     let mut last_frame_time = Instant::now();
     let mut last_lum_sample_time = Instant::now();
+    let mut last_sample_pos = initial_pos;
 
     // Dynamically match user screen refresh rate (e.g. 144 Hz, 240 Hz, 360 Hz)
     let display_hz = get_max_display_frequency().max(60);
@@ -163,9 +164,12 @@ fn run_windows() {
                 target_color_blend = 1.0;
             }
             ThemeMode::Auto => {
-                // Sample background luminance periodically (~30 Hz) with hysteresis
-                if now.duration_since(last_lum_sample_time) >= Duration::from_millis(32) {
+                // Only sample background luminance if cursor has physically moved (> 8px)
+                // and at least 60ms have elapsed. Eliminates GPU readback stall and PCI-e bus contention.
+                let dist_sq = (current_target.x - last_sample_pos.x).powi(2) + (current_target.y - last_sample_pos.y).powi(2);
+                if dist_sq > 64.0 && now.duration_since(last_lum_sample_time) >= Duration::from_millis(60) {
                     last_lum_sample_time = now;
+                    last_sample_pos = current_target;
                     let lum = sample_screen_luminance(current_target);
                     // Hysteresis deadband:
                     // > 140.0: light background -> target Black cursor (1.0)
@@ -226,10 +230,12 @@ fn run_windows() {
             let elapsed = now.elapsed();
             if elapsed < frame_budget {
                 let remaining = frame_budget - elapsed;
-                if remaining > Duration::from_millis(1) {
+                if remaining > Duration::from_millis(2) {
                     std::thread::sleep(Duration::from_millis(1));
                 }
-                std::thread::yield_now();
+                while now.elapsed() < frame_budget {
+                    std::hint::spin_loop();
+                }
             }
         }
     }

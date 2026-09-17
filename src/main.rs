@@ -108,7 +108,7 @@ fn run_windows() {
     let mut was_paused = false;
 
     loop {
-        // A. Check exit conditions (Tray "Salir" or emergency hotkey Ctrl + Shift + Esc)
+        // A. Check exit conditions (Tray "Salir" or emergency hotkey Ctrl + Alt + Shift + Esc)
         if tray.should_exit() || is_emergency_escape_pressed() {
             break;
         }

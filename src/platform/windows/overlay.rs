@@ -154,7 +154,6 @@ impl OverlayWindow {
             }
 
             if hwnd.is_null() {
-                eprintln!("[TinyCursor] Error: No se pudo crear la ventana de overlay.");
                 return None;
             }
 

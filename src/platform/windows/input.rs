@@ -6,7 +6,7 @@ use super::renderer::RenderCursorKind;
 use super::sys::{
     GetAsyncKeyState, GetClassNameW, GetCursorPos, GetDC, GetDeviceCaps, GetPixel,
     GetWindowLongW, GetWindowRect, ReleaseDC, WindowFromPoint, CLR_INVALID, GWL_STYLE,
-    POINT, RECT, VK_CONTROL, VK_ESCAPE, VK_LBUTTON, VK_SHIFT, VREFRESH, WS_THICKFRAME,
+    POINT, RECT, VK_CONTROL, VK_ESCAPE, VK_LBUTTON, VK_MENU, VK_SHIFT, VREFRESH, WS_THICKFRAME,
 };
 
 /// Queries the real hardware mouse cursor position in virtual screen coordinates.
@@ -28,13 +28,15 @@ pub fn is_left_button_down() -> bool {
     (state as u16 & 0x8000) != 0
 }
 
-/// Checks if the emergency fail-safe hotkey (Ctrl + Shift + Esc) is pressed.
+/// Checks if the emergency fail-safe hotkey (Ctrl + Alt + Shift + Esc) is held down.
+/// Requires Alt to never collide with standard Windows Task Manager shortcut (Ctrl + Shift + Esc).
 #[inline]
 pub fn is_emergency_escape_pressed() -> bool {
-    let ctrl = unsafe { GetAsyncKeyState(VK_CONTROL) } as u16 & 0x8000 != 0;
-    let shift = unsafe { GetAsyncKeyState(VK_SHIFT) } as u16 & 0x8000 != 0;
-    let esc = unsafe { GetAsyncKeyState(VK_ESCAPE) } as u16 & 0x8000 != 0;
-    ctrl && shift && esc
+    let ctrl = unsafe { GetAsyncKeyState(VK_CONTROL) } < 0;
+    let alt = unsafe { GetAsyncKeyState(VK_MENU) } < 0;
+    let shift = unsafe { GetAsyncKeyState(VK_SHIFT) } < 0;
+    let esc = unsafe { GetAsyncKeyState(VK_ESCAPE) } < 0;
+    ctrl && alt && shift && esc
 }
 
 /// Samples the screen luminance around the given hardware cursor position.

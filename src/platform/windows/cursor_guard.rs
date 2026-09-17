@@ -38,7 +38,6 @@ pub fn restore_system_cursors() {
             // SPI_SETCURSORS (0x0057) forces Windows to reload default cursors
             SystemParametersInfoW(SPI_SETCURSORS, 0, std::ptr::null_mut(), 0);
         }
-        println!(">>> [TinyCursor] Cursores del sistema restaurados.");
     }
 }
 
@@ -77,7 +76,6 @@ impl SystemCursorGuard {
             );
 
             if blank_cursor.is_null() {
-                eprintln!("[TinyCursor] Error: No se pudo crear el cursor transparente.");
                 return None;
             }
 
@@ -94,7 +92,6 @@ impl SystemCursorGuard {
         }
 
         CURSOR_IS_HIDDEN.store(true, Ordering::SeqCst);
-        println!(">>> [TinyCursor] Cursores del sistema ocultados con éxito.");
 
         Some(Self { _private: () })
     }

@@ -160,6 +160,7 @@ pub const DIB_RGB_COLORS: u32 = 0;
 pub const VK_LBUTTON: i32 = 0x01;
 pub const VK_SHIFT: i32 = 0x10;
 pub const VK_CONTROL: i32 = 0x11;
+pub const VK_MENU: i32 = 0x12;
 pub const VK_ESCAPE: i32 = 0x1B;
 
 // System Cursor Parameters

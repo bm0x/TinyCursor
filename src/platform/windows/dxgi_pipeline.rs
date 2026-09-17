@@ -1,12 +1,13 @@
-//! Modern DirectX 11 / DXGI Flip Model + DirectComposition + Direct2D Hardware Pipeline.
+//! Modern DirectX 11 / DXGI Modern Flip Model + DirectComposition + Direct2D Hardware Pipeline.
 //!
 //! Features:
 //! - DXGI Modern Flip Model (`DXGI_SWAP_EFFECT_FLIP_DISCARD`) with premultiplied alpha.
-//! - DirectComposition visual tree integration on Windows 10/11.
-//! - Hardware VBLANK synchronized `Present(1, 0)` with zero Thread::sleep or spin_loop.
-//! - QueryPerformanceCounter sub-microsecond delta calculation.
-//! - Direct2D hardware-accelerated 3D volumetric cursor rendering with affine transforms.
-//! - Real-time contrast adaptation (Pearl White / Obsidian Black with volumetric bevel).
+//! - DirectComposition visual tree integration on Windows 10/11 with zero redirection buffer.
+//! - Hardware VBLANK synchronized `Present(1, 0)` with ZERO Thread::sleep or spin-wait.
+//! - Hardware GPU rasterization using high-resolution textures (`ID2D1Bitmap`) with bilinear filtering.
+//! - Calibrated orientation: smooth organic delta tilt for Arrow, fixed upright orientation for Hand/I-Beam.
+//! - Real-time contrast adaptation (dynamic Pearl White <-> Obsidian Black cross-fade).
+//! - Continuous topmost Z-order reinforcement (`HWND_TOPMOST`) over shell and taskbar.
 
 use windows::{
     core::*,
@@ -20,43 +21,61 @@ use windows::{
     Win32::Graphics::Dxgi::*,
     Win32::Graphics::Dxgi::Common::*,
     Win32::System::Performance::*,
+    Win32::UI::WindowsAndMessaging::*,
 };
 
 use crate::core::math::Vec2;
 use crate::core::physics::SmoothCursorPhysics;
+use super::assets::*;
 use super::renderer::RenderCursorKind;
 
+/// Pre-loaded pair of high-resolution White and Black GPU textures for a cursor state.
+struct GpuCursorPair {
+    white: ID2D1Bitmap1,
+    black: ID2D1Bitmap1,
+    hotspot_x: f32,
+    hotspot_y: f32,
+}
+
 pub struct DxgiPipeline {
-    device: ID3D11Device,
-    context: ID3D11DeviceContext,
+    hwnd: HWND,
+    _device: ID3D11Device,
+    _context: ID3D11DeviceContext,
     swap_chain: IDXGISwapChain1,
-    dcomp_device: IDCompositionDevice,
-    dcomp_target: IDCompositionTarget,
-    dcomp_visual: IDCompositionVisual,
-    d2d_factory: ID2D1Factory1,
+    _dcomp_device: IDCompositionDevice,
+    _dcomp_target: IDCompositionTarget,
+    _dcomp_visual: IDCompositionVisual,
+    _d2d_factory: ID2D1Factory1,
     d2d_context: ID2D1DeviceContext,
-    d2d_target_bitmap: ID2D1Bitmap1,
-    
-    // Cached Path Geometries
-    geo_arrow: ID2D1PathGeometry1,
-    geo_hand: ID2D1PathGeometry1,
-    geo_ibeam: ID2D1PathGeometry1,
-    geo_resize_ns: ID2D1PathGeometry1,
-    geo_resize_we: ID2D1PathGeometry1,
-    geo_move: ID2D1PathGeometry1,
-    geo_zoom_in: ID2D1PathGeometry1,
-    geo_zoom_out: ID2D1PathGeometry1,
+    _d2d_target_bitmap: ID2D1Bitmap1,
+
+    // High-fidelity GPU textures for all system cursor states
+    tex_arrow: GpuCursorPair,
+    tex_hand: GpuCursorPair,
+    tex_ibeam: GpuCursorPair,
+    tex_crosshair: GpuCursorPair,
+    tex_resize_ns: GpuCursorPair,
+    tex_resize_we: GpuCursorPair,
+    tex_resize_nwse: GpuCursorPair,
+    tex_resize_nesw: GpuCursorPair,
+    tex_move: GpuCursorPair,
+    tex_zoom_in: GpuCursorPair,
+    tex_zoom_out: GpuCursorPair,
+    tex_wait: GpuCursorPair,
+    tex_help: GpuCursorPair,
+    tex_unavailable: GpuCursorPair,
 
     perf_freq: i64,
     prev_counter: i64,
-    width: u32,
-    height: u32,
+    _width: u32,
+    _height: u32,
     offset_x: f32,
     offset_y: f32,
     animation_time: f32,
 }
 
 impl DxgiPipeline {
+    /// Creates and initializes the complete DirectX 11 / DirectComposition / Direct2D pipeline.
     pub fn new(hwnd_raw: *mut std::ffi::c_void, vx: i32, vy: i32, width: u32, height: u32) -> Result<Self> {
         let hwnd = HWND(hwnd_raw as _);
         unsafe {
@@ -139,38 +158,51 @@ impl DxgiPipeline {
             d2d_context.SetTarget(&d2d_target_bitmap);
             d2d_context.SetAntialiasMode(D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
 
-            // Pre-compile cached 3D volumetric cursor path geometries
-            let geo_arrow = create_arrow_geometry(&d2d_factory)?;
-            let geo_hand = create_hand_geometry(&d2d_factory)?;
-            let geo_ibeam = create_ibeam_geometry(&d2d_factory)?;
-            let geo_resize_ns = create_resize_geometry(&d2d_factory, false)?;
-            let geo_resize_we = create_resize_geometry(&d2d_factory, true)?;
-            let geo_move = create_move_geometry(&d2d_factory)?;
-            let geo_zoom_in = create_zoom_geometry(&d2d_factory, true)?;
-            let geo_zoom_out = create_zoom_geometry(&d2d_factory, false)?;
+            // Upload all pixel-perfect textures to GPU memory
+            let tex_arrow = create_gpu_pair(&d2d_context, &WHITE_ARROW_PIXELS, &BLACK_ARROW_PIXELS, ARROW_HOTSPOT_X, ARROW_HOTSPOT_Y)?;
+            let tex_hand = create_gpu_pair(&d2d_context, &WHITE_HAND_PIXELS, &BLACK_HAND_PIXELS, HAND_HOTSPOT_X, HAND_HOTSPOT_Y)?;
+            let tex_ibeam = create_gpu_pair(&d2d_context, &WHITE_IBEAM_PIXELS, &BLACK_IBEAM_PIXELS, IBEAM_HOTSPOT_X, IBEAM_HOTSPOT_Y)?;
+            let tex_crosshair = create_gpu_pair(&d2d_context, &WHITE_CROSSHAIR_PIXELS, &BLACK_CROSSHAIR_PIXELS, CROSSHAIR_HOTSPOT_X, CROSSHAIR_HOTSPOT_Y)?;
+            let tex_resize_ns = create_gpu_pair(&d2d_context, &WHITE_RESIZE_NS_PIXELS, &BLACK_RESIZE_NS_PIXELS, RESIZE_NS_HOTSPOT_X, RESIZE_NS_HOTSPOT_Y)?;
+            let tex_resize_we = create_gpu_pair(&d2d_context, &WHITE_RESIZE_WE_PIXELS, &BLACK_RESIZE_WE_PIXELS, RESIZE_WE_HOTSPOT_X, RESIZE_WE_HOTSPOT_Y)?;
+            let tex_resize_nwse = create_gpu_pair(&d2d_context, &WHITE_RESIZE_NWSE_PIXELS, &BLACK_RESIZE_NWSE_PIXELS, RESIZE_NWSE_HOTSPOT_X, RESIZE_NWSE_HOTSPOT_Y)?;
+            let tex_resize_nesw = create_gpu_pair(&d2d_context, &WHITE_RESIZE_NESW_PIXELS, &BLACK_RESIZE_NESW_PIXELS, RESIZE_NESW_HOTSPOT_X, RESIZE_NESW_HOTSPOT_Y)?;
+            let tex_move = create_gpu_pair(&d2d_context, &WHITE_MOVE_PIXELS, &BLACK_MOVE_PIXELS, MOVE_HOTSPOT_X, MOVE_HOTSPOT_Y)?;
+            let tex_zoom_in = create_gpu_pair(&d2d_context, &WHITE_ZOOM_IN_PIXELS, &BLACK_ZOOM_IN_PIXELS, ZOOM_IN_HOTSPOT_X, ZOOM_IN_HOTSPOT_Y)?;
+            let tex_zoom_out = create_gpu_pair(&d2d_context, &WHITE_ZOOM_OUT_PIXELS, &BLACK_ZOOM_OUT_PIXELS, ZOOM_OUT_HOTSPOT_X, ZOOM_OUT_HOTSPOT_Y)?;
+            let tex_wait = create_gpu_pair(&d2d_context, &WHITE_WAIT_PIXELS, &BLACK_WAIT_PIXELS, WAIT_HOTSPOT_X, WAIT_HOTSPOT_Y)?;
+            let tex_help = create_gpu_pair(&d2d_context, &WHITE_HELP_PIXELS, &BLACK_HELP_PIXELS, HELP_HOTSPOT_X, HELP_HOTSPOT_Y)?;
+            let tex_unavailable = create_gpu_pair(&d2d_context, &WHITE_UNAVAILABLE_PIXELS, &BLACK_UNAVAILABLE_PIXELS, UNAVAILABLE_HOTSPOT_X, UNAVAILABLE_HOTSPOT_Y)?;
 
             Ok(Self {
-                device,
-                context,
+                hwnd,
+                _device: device,
+                _context: context,
                 swap_chain,
-                dcomp_device,
-                dcomp_target,
-                dcomp_visual,
-                d2d_factory,
+                _dcomp_device: dcomp_device,
+                _dcomp_target: dcomp_target,
+                _dcomp_visual: dcomp_visual,
+                _d2d_factory: d2d_factory,
                 d2d_context,
-                d2d_target_bitmap,
-                geo_arrow,
-                geo_hand,
-                geo_ibeam,
-                geo_resize_ns,
-                geo_resize_we,
-                geo_move,
-                geo_zoom_in,
-                geo_zoom_out,
+                _d2d_target_bitmap: d2d_target_bitmap,
+                tex_arrow,
+                tex_hand,
+                tex_ibeam,
+                tex_crosshair,
+                tex_resize_ns,
+                tex_resize_we,
+                tex_resize_nwse,
+                tex_resize_nesw,
+                tex_move,
+                tex_zoom_in,
+                tex_zoom_out,
+                tex_wait,
+                tex_help,
+                tex_unavailable,
                 perf_freq,
                 prev_counter,
-                width,
-                height,
+                _width: width,
+                _height: height,
                 offset_x: vx as f32,
                 offset_y: vy as f32,
                 animation_time: 0.0,
@@ -180,8 +212,8 @@ impl DxgiPipeline {
 
     /// Primary Hardware VBLANK Render Tick.
     ///
-    /// Computes delta time using QPC, updates spring physics, renders the 3D volumetric cursor
-    /// via Direct2D, and synchronizes to monitor VBLANK with `Present(1, 0)`.
+    /// Computes delta time using QPC, updates spring physics, renders the high-fidelity cursor
+    /// via Direct2D on GPU, and synchronizes strictly to monitor VBLANK with `Present(1, 0)`.
     pub fn run_tick(
         &mut self,
         physics: &mut SmoothCursorPhysics,
@@ -197,7 +229,7 @@ impl DxgiPipeline {
             let mut delta_time = (current_counter - self.prev_counter) as f32 / self.perf_freq as f32;
             self.prev_counter = current_counter;
 
-            // Clamp delta on window move / pauses
+            // Clamp delta on pauses or lag spikes
             if delta_time <= 0.0 || delta_time > 0.05 {
                 delta_time = 1.0 / 144.0;
             }
@@ -206,7 +238,18 @@ impl DxgiPipeline {
             // 2. Solve Spring Physics (Semi-implicit Euler + Squash & Stretch)
             physics.update(target_pos, delta_time);
 
-            // 3. Begin Direct2D Hardware Drawing
+            // 3. Continuously reinforce HWND_TOPMOST priority over Taskbar and Shell
+            let _ = SetWindowPos(
+                self.hwnd,
+                HWND_TOPMOST,
+                0,
+                0,
+                0,
+                0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_SHOWWINDOW,
+            );
+
+            // 4. Begin Direct2D Hardware Drawing
             self.d2d_context.BeginDraw();
             self.d2d_context.Clear(Some(&D2D1_COLOR_F {
                 r: 0.0,
@@ -215,8 +258,8 @@ impl DxgiPipeline {
                 a: 0.0,
             }));
 
-            // 4. Render Volumetric 3D Cursor with Drop Shadow and Bevel
-            self.draw_volumetric_cursor(
+            // 5. Draw High-Fidelity GPU Textured Cursor
+            self.draw_hardware_cursor(
                 physics.position,
                 physics.angle,
                 physics.scale_x,
@@ -228,11 +271,11 @@ impl DxgiPipeline {
 
             self.d2d_context.EndDraw(None, None)?;
 
-            // 5. Hardware VBLANK synchronized Present
+            // 6. Hardware VBLANK synchronized Present
             // SyncInterval = 1 -> Locks directly to monitor's physical VBLANK interrupt!
             // 144 Hz display -> blocks ~6.94 ms
             // 240 Hz display -> blocks ~4.16 ms
-            // 60 Hz display -> blocks ~16.66 ms
+            // 60 Hz display  -> blocks ~16.66 ms
             self.swap_chain.Present(1, DXGI_PRESENT(0)).ok()?;
 
             Ok(())
@@ -255,8 +298,9 @@ impl DxgiPipeline {
         }
     }
 
-    /// Draws the volumetric 3D cursor with smooth lighting and soft drop shadow.
-    unsafe fn draw_volumetric_cursor(
+    /// Draws the high-fidelity cursor texture on the GPU with bilinear interpolation,
+    /// soft ambient projection shadow, and dynamic White <-> Black theme morphing.
+    unsafe fn draw_hardware_cursor(
         &self,
         pos: Vec2,
         angle: f32,
@@ -266,81 +310,102 @@ impl DxgiPipeline {
         theme_blend: f32,
         is_clicking: bool,
     ) -> Result<()> {
-        let (geo, hotspot_x, hotspot_y) = match kind {
-            RenderCursorKind::Arrow => (&self.geo_arrow, 3.0, 2.0),
-            RenderCursorKind::Hand => (&self.geo_hand, 10.0, 2.0),
-            RenderCursorKind::IBeam => (&self.geo_ibeam, 8.0, 13.0),
-            RenderCursorKind::ResizeNS => (&self.geo_resize_ns, 12.0, 12.0),
-            RenderCursorKind::ResizeWE => (&self.geo_resize_we, 12.0, 12.0),
-            RenderCursorKind::ResizeNWSE | RenderCursorKind::ResizeNESW => (&self.geo_resize_ns, 12.0, 12.0),
-            RenderCursorKind::Move => (&self.geo_move, 12.0, 12.0),
-            RenderCursorKind::ZoomIn => (&self.geo_zoom_in, 10.0, 10.0),
-            RenderCursorKind::ZoomOut => (&self.geo_zoom_out, 10.0, 10.0),
-            RenderCursorKind::Crosshair => (&self.geo_move, 12.0, 12.0),
-            RenderCursorKind::Wait | RenderCursorKind::Help | RenderCursorKind::Unavailable => (&self.geo_arrow, 3.0, 2.0),
+        let (pair, is_arrow, is_hand) = match kind {
+            RenderCursorKind::Arrow => (&self.tex_arrow, true, false),
+            RenderCursorKind::Hand => (&self.tex_hand, false, true),
+            RenderCursorKind::IBeam => (&self.tex_ibeam, false, false),
+            RenderCursorKind::Crosshair => (&self.tex_crosshair, false, false),
+            RenderCursorKind::ResizeNS => (&self.tex_resize_ns, false, false),
+            RenderCursorKind::ResizeWE => (&self.tex_resize_we, false, false),
+            RenderCursorKind::ResizeNWSE => (&self.tex_resize_nwse, false, false),
+            RenderCursorKind::ResizeNESW => (&self.tex_resize_nesw, false, false),
+            RenderCursorKind::Move => (&self.tex_move, false, false),
+            RenderCursorKind::ZoomIn => (&self.tex_zoom_in, false, false),
+            RenderCursorKind::ZoomOut => (&self.tex_zoom_out, false, false),
+            RenderCursorKind::Wait => (&self.tex_wait, false, false),
+            RenderCursorKind::Help => (&self.tex_help, false, false),
+            RenderCursorKind::Unavailable => (&self.tex_unavailable, false, false),
         };
-
-        // Theme colors (interpolating between Pearl White and Obsidian Black)
-        let t = theme_blend.clamp(0.0, 1.0);
-        let fill_color = D2D1_COLOR_F {
-            r: lerp(0.98, 0.08, t),
-            g: lerp(0.98, 0.08, t),
-            b: lerp(1.00, 0.10, t),
-            a: 0.98,
-        };
-        let bevel_color = D2D1_COLOR_F {
-            r: lerp(0.85, 0.38, t),
-            g: lerp(0.88, 0.38, t),
-            b: lerp(0.92, 0.42, t),
-            a: 0.95,
-        };
-        let shadow_color = D2D1_COLOR_F {
-            r: 0.0,
-            g: 0.0,
-            b: 0.0,
-            a: 0.35,
-        };
-
-        let fill_brush = self.d2d_context.CreateSolidColorBrush(&fill_color, None)?;
-        let bevel_brush = self.d2d_context.CreateSolidColorBrush(&bevel_color, None)?;
-        let shadow_brush = self.d2d_context.CreateSolidColorBrush(&shadow_color, None)?;
-
-        // Additional click squash
-        let click_scale = if is_clicking { 0.88 } else { 1.0 };
-        let sx = scale_x * click_scale;
-        let sy = scale_y * click_scale;
 
         let local_x = pos.x - self.offset_x;
         let local_y = pos.y - self.offset_y;
 
-        // 1. Draw Drop Shadow (3px offset along Y, soft projection)
+        // Base scale: 0.50 maps the 64x64 source texture to a sharp ~32px cursor
+        let (draw_angle, sx, sy) = if is_arrow {
+            // Relative angle deviation from resting pose (-2.06 rad), clamped to +/- 28 degrees
+            const ARROW_BASE_ANGLE: f32 = -2.06;
+            let delta = (angle - ARROW_BASE_ANGLE + std::f32::consts::PI)
+                .rem_euclid(2.0 * std::f32::consts::PI) - std::f32::consts::PI;
+            let clamped_delta = delta.clamp(-0.48, 0.48);
+            let base_scale = 0.50;
+            (clamped_delta, scale_x * base_scale, scale_y * base_scale)
+        } else if is_hand {
+            // Hand pointer always stays upright! Subtle click squash on button down
+            let click_squash = if is_clicking { 0.90 } else { 1.0 };
+            let base_scale = 0.48 * click_squash;
+            (0.0f32, base_scale, base_scale)
+        } else {
+            // Text, resize, and utility cursors maintain fixed orientation
+            let base_scale = 0.50;
+            (0.0f32, base_scale, base_scale)
+        };
+
+        // 1. Draw Soft Drop Projection Shadow (offset +1.5, +2.5) with opacity 0.28
         let shadow_matrix = make_affine_matrix(
-            local_x + 2.5,
-            local_y + 3.5,
-            angle,
-            sx * 1.04,
-            sy * 1.04,
-            hotspot_x,
-            hotspot_y,
+            local_x + 1.5,
+            local_y + 2.5,
+            draw_angle,
+            sx,
+            sy,
+            pair.hotspot_x,
+            pair.hotspot_y,
         );
         self.d2d_context.SetTransform(&shadow_matrix);
-        self.d2d_context.FillGeometry(geo, &shadow_brush, None);
+        self.d2d_context.DrawBitmap(
+            &pair.black,
+            None,
+            0.28,
+            D2D1_INTERPOLATION_MODE_LINEAR,
+            None,
+            None,
+        );
 
-        // 2. Draw Main Volumetric Body
+        // 2. Draw Main Crisp Cursor Body with Dynamic Theme Blending
         let body_matrix = make_affine_matrix(
             local_x,
             local_y,
-            angle,
+            draw_angle,
             sx,
             sy,
-            hotspot_x,
-            hotspot_y,
+            pair.hotspot_x,
+            pair.hotspot_y,
         );
         self.d2d_context.SetTransform(&body_matrix);
-        self.d2d_context.FillGeometry(geo, &fill_brush, None);
 
-        // 3. Draw Pronounced 3D Bevel Perimeter
-        self.d2d_context.DrawGeometry(geo, &bevel_brush, 1.6, None);
+        let t = theme_blend.clamp(0.0, 1.0);
+        let inv_t = 1.0 - t;
+
+        if inv_t > 0.01 {
+            self.d2d_context.DrawBitmap(
+                &pair.white,
+                None,
+                inv_t,
+                D2D1_INTERPOLATION_MODE_LINEAR,
+                None,
+                None,
+            );
+        }
+
+        if t > 0.01 {
+            self.d2d_context.DrawBitmap(
+                &pair.black,
+                None,
+                t,
+                D2D1_INTERPOLATION_MODE_LINEAR,
+                None,
+                None,
+            );
+        }
 
         // Reset transform to identity
         self.d2d_context.SetTransform(&Matrix3x2 {
@@ -353,9 +418,45 @@ impl DxgiPipeline {
     }
 }
 
-#[inline]
-fn lerp(a: f32, b: f32, t: f32) -> f32 {
-    a + (b - a) * t
+unsafe fn create_gpu_pair(
+    context: &ID2D1DeviceContext,
+    white_pixels: &[u32; 64 * 64],
+    black_pixels: &[u32; 64 * 64],
+    hotspot_x: f32,
+    hotspot_y: f32,
+) -> Result<GpuCursorPair> {
+    let props = D2D1_BITMAP_PROPERTIES1 {
+        pixelFormat: D2D1_PIXEL_FORMAT {
+            format: DXGI_FORMAT_B8G8R8A8_UNORM,
+            alphaMode: D2D1_ALPHA_MODE_PREMULTIPLIED,
+        },
+        dpiX: 96.0,
+        dpiY: 96.0,
+        bitmapOptions: D2D1_BITMAP_OPTIONS_NONE,
+        colorContext: std::mem::ManuallyDrop::new(None),
+    };
+    let size = D2D_SIZE_U {
+        width: 64,
+        height: 64,
+    };
+    let white = context.CreateBitmap(
+        size,
+        Some(white_pixels.as_ptr() as *const _),
+        64 * 4,
+        &props,
+    )?;
+    let black = context.CreateBitmap(
+        size,
+        Some(black_pixels.as_ptr() as *const _),
+        64 * 4,
+        &props,
+    )?;
+    Ok(GpuCursorPair {
+        white,
+        black,
+        hotspot_x,
+        hotspot_y,
+    })
 }
 
 pub fn make_affine_matrix(
@@ -386,197 +487,4 @@ pub fn make_affine_matrix(
         M31: dx,
         M32: dy,
     }
-}
-
-// =========================================================================
-// Geometry Constructors for Volumetric 3D Cursors (Magic Pointer Style)
-// =========================================================================
-
-unsafe fn create_arrow_geometry(factory: &ID2D1Factory1) -> Result<ID2D1PathGeometry1> {
-    let geo = factory.CreatePathGeometry()?;
-    let sink = geo.Open()?;
-
-    // Arrow contour with rounded corners and curved wings
-    sink.BeginFigure(D2D_POINT_2F { x: 3.0, y: 2.0 }, D2D1_FIGURE_BEGIN_FILLED);
-    sink.AddBezier(&D2D1_BEZIER_SEGMENT {
-        point1: D2D_POINT_2F { x: 4.0, y: 10.0 },
-        point2: D2D_POINT_2F { x: 3.5, y: 20.0 },
-        point3: D2D_POINT_2F { x: 3.0, y: 28.0 },
-    });
-    sink.AddBezier(&D2D1_BEZIER_SEGMENT {
-        point1: D2D_POINT_2F { x: 4.5, y: 28.5 },
-        point2: D2D_POINT_2F { x: 6.5, y: 25.0 },
-        point3: D2D_POINT_2F { x: 9.0, y: 22.0 },
-    });
-    sink.AddLine(D2D_POINT_2F { x: 21.0, y: 22.0 });
-    sink.AddBezier(&D2D1_BEZIER_SEGMENT {
-        point1: D2D_POINT_2F { x: 21.5, y: 20.5 },
-        point2: D2D_POINT_2F { x: 14.0, y: 12.0 },
-        point3: D2D_POINT_2F { x: 3.0, y: 2.0 },
-    });
-    sink.EndFigure(D2D1_FIGURE_END_CLOSED);
-    sink.Close()?;
-
-    Ok(geo)
-}
-
-unsafe fn create_hand_geometry(factory: &ID2D1Factory1) -> Result<ID2D1PathGeometry1> {
-    let geo = factory.CreatePathGeometry()?;
-    let sink = geo.Open()?;
-
-    sink.BeginFigure(D2D_POINT_2F { x: 10.0, y: 2.0 }, D2D1_FIGURE_BEGIN_FILLED);
-    // Index finger left
-    sink.AddLine(D2D_POINT_2F { x: 8.0, y: 14.0 });
-    // Thumb
-    sink.AddBezier(&D2D1_BEZIER_SEGMENT {
-        point1: D2D_POINT_2F { x: 4.0, y: 16.0 },
-        point2: D2D_POINT_2F { x: 2.0, y: 19.0 },
-        point3: D2D_POINT_2F { x: 4.0, y: 23.0 },
-    });
-    // Palm bottom
-    sink.AddLine(D2D_POINT_2F { x: 7.0, y: 28.0 });
-    sink.AddLine(D2D_POINT_2F { x: 18.0, y: 28.0 });
-    // Knuckles (middle, ring, pinky)
-    sink.AddBezier(&D2D1_BEZIER_SEGMENT {
-        point1: D2D_POINT_2F { x: 20.0, y: 23.0 },
-        point2: D2D_POINT_2F { x: 19.0, y: 14.0 },
-        point3: D2D_POINT_2F { x: 13.0, y: 14.0 },
-    });
-    // Index finger right
-    sink.AddLine(D2D_POINT_2F { x: 13.0, y: 2.0 });
-    // Index finger tip curve
-    sink.AddBezier(&D2D1_BEZIER_SEGMENT {
-        point1: D2D_POINT_2F { x: 13.0, y: 0.5 },
-        point2: D2D_POINT_2F { x: 10.0, y: 0.5 },
-        point3: D2D_POINT_2F { x: 10.0, y: 2.0 },
-    });
-    sink.EndFigure(D2D1_FIGURE_END_CLOSED);
-    sink.Close()?;
-
-    Ok(geo)
-}
-
-unsafe fn create_ibeam_geometry(factory: &ID2D1Factory1) -> Result<ID2D1PathGeometry1> {
-    let geo = factory.CreatePathGeometry()?;
-    let sink = geo.Open()?;
-
-    sink.BeginFigure(D2D_POINT_2F { x: 3.0, y: 3.0 }, D2D1_FIGURE_BEGIN_FILLED);
-    sink.AddLine(D2D_POINT_2F { x: 13.0, y: 3.0 });
-    sink.AddLine(D2D_POINT_2F { x: 13.0, y: 6.0 });
-    sink.AddLine(D2D_POINT_2F { x: 9.5, y: 6.0 });
-    sink.AddLine(D2D_POINT_2F { x: 9.5, y: 20.0 });
-    sink.AddLine(D2D_POINT_2F { x: 13.0, y: 20.0 });
-    sink.AddLine(D2D_POINT_2F { x: 13.0, y: 23.0 });
-    sink.AddLine(D2D_POINT_2F { x: 3.0, y: 23.0 });
-    sink.AddLine(D2D_POINT_2F { x: 3.0, y: 20.0 });
-    sink.AddLine(D2D_POINT_2F { x: 6.5, y: 20.0 });
-    sink.AddLine(D2D_POINT_2F { x: 6.5, y: 6.0 });
-    sink.AddLine(D2D_POINT_2F { x: 3.0, y: 6.0 });
-    sink.EndFigure(D2D1_FIGURE_END_CLOSED);
-    sink.Close()?;
-
-    Ok(geo)
-}
-
-unsafe fn create_resize_geometry(factory: &ID2D1Factory1, horizontal: bool) -> Result<ID2D1PathGeometry1> {
-    let geo = factory.CreatePathGeometry()?;
-    let sink = geo.Open()?;
-
-    if horizontal {
-        sink.BeginFigure(D2D_POINT_2F { x: 2.0, y: 12.0 }, D2D1_FIGURE_BEGIN_FILLED);
-        sink.AddLine(D2D_POINT_2F { x: 7.0, y: 7.0 });
-        sink.AddLine(D2D_POINT_2F { x: 7.0, y: 10.0 });
-        sink.AddLine(D2D_POINT_2F { x: 17.0, y: 10.0 });
-        sink.AddLine(D2D_POINT_2F { x: 17.0, y: 7.0 });
-        sink.AddLine(D2D_POINT_2F { x: 22.0, y: 12.0 });
-        sink.AddLine(D2D_POINT_2F { x: 17.0, y: 17.0 });
-        sink.AddLine(D2D_POINT_2F { x: 17.0, y: 14.0 });
-        sink.AddLine(D2D_POINT_2F { x: 7.0, y: 14.0 });
-        sink.AddLine(D2D_POINT_2F { x: 7.0, y: 17.0 });
-    } else {
-        sink.BeginFigure(D2D_POINT_2F { x: 12.0, y: 2.0 }, D2D1_FIGURE_BEGIN_FILLED);
-        sink.AddLine(D2D_POINT_2F { x: 7.0, y: 7.0 });
-        sink.AddLine(D2D_POINT_2F { x: 10.0, y: 7.0 });
-        sink.AddLine(D2D_POINT_2F { x: 10.0, y: 17.0 });
-        sink.AddLine(D2D_POINT_2F { x: 7.0, y: 17.0 });
-        sink.AddLine(D2D_POINT_2F { x: 12.0, y: 22.0 });
-        sink.AddLine(D2D_POINT_2F { x: 17.0, y: 17.0 });
-        sink.AddLine(D2D_POINT_2F { x: 14.0, y: 17.0 });
-        sink.AddLine(D2D_POINT_2F { x: 14.0, y: 7.0 });
-        sink.AddLine(D2D_POINT_2F { x: 17.0, y: 7.0 });
-    }
-    sink.EndFigure(D2D1_FIGURE_END_CLOSED);
-    sink.Close()?;
-
-    Ok(geo)
-}
-
-unsafe fn create_move_geometry(factory: &ID2D1Factory1) -> Result<ID2D1PathGeometry1> {
-    let geo = factory.CreatePathGeometry()?;
-    let sink = geo.Open()?;
-
-    sink.BeginFigure(D2D_POINT_2F { x: 12.0, y: 2.0 }, D2D1_FIGURE_BEGIN_FILLED);
-    sink.AddLine(D2D_POINT_2F { x: 9.0, y: 6.0 });
-    sink.AddLine(D2D_POINT_2F { x: 11.0, y: 6.0 });
-    sink.AddLine(D2D_POINT_2F { x: 11.0, y: 9.0 });
-    sink.AddLine(D2D_POINT_2F { x: 6.0, y: 9.0 });
-    sink.AddLine(D2D_POINT_2F { x: 6.0, y: 7.0 });
-    sink.AddLine(D2D_POINT_2F { x: 2.0, y: 12.0 });
-    sink.AddLine(D2D_POINT_2F { x: 6.0, y: 17.0 });
-    sink.AddLine(D2D_POINT_2F { x: 6.0, y: 15.0 });
-    sink.AddLine(D2D_POINT_2F { x: 11.0, y: 15.0 });
-    sink.AddLine(D2D_POINT_2F { x: 11.0, y: 18.0 });
-    sink.AddLine(D2D_POINT_2F { x: 9.0, y: 18.0 });
-    sink.AddLine(D2D_POINT_2F { x: 12.0, y: 22.0 });
-    sink.AddLine(D2D_POINT_2F { x: 15.0, y: 18.0 });
-    sink.AddLine(D2D_POINT_2F { x: 13.0, y: 18.0 });
-    sink.AddLine(D2D_POINT_2F { x: 13.0, y: 15.0 });
-    sink.AddLine(D2D_POINT_2F { x: 18.0, y: 15.0 });
-    sink.AddLine(D2D_POINT_2F { x: 18.0, y: 17.0 });
-    sink.AddLine(D2D_POINT_2F { x: 22.0, y: 12.0 });
-    sink.AddLine(D2D_POINT_2F { x: 18.0, y: 7.0 });
-    sink.AddLine(D2D_POINT_2F { x: 18.0, y: 9.0 });
-    sink.AddLine(D2D_POINT_2F { x: 13.0, y: 9.0 });
-    sink.AddLine(D2D_POINT_2F { x: 13.0, y: 6.0 });
-    sink.AddLine(D2D_POINT_2F { x: 15.0, y: 6.0 });
-    sink.EndFigure(D2D1_FIGURE_END_CLOSED);
-    sink.Close()?;
-
-    Ok(geo)
-}
-
-unsafe fn create_zoom_geometry(factory: &ID2D1Factory1, _is_in: bool) -> Result<ID2D1PathGeometry1> {
-    let geo = factory.CreatePathGeometry()?;
-    let sink = geo.Open()?;
-
-    // Circular lens rim
-    sink.BeginFigure(D2D_POINT_2F { x: 10.0, y: 2.0 }, D2D1_FIGURE_BEGIN_FILLED);
-    sink.AddBezier(&D2D1_BEZIER_SEGMENT {
-        point1: D2D_POINT_2F { x: 15.5, y: 2.0 },
-        point2: D2D_POINT_2F { x: 18.0, y: 4.5 },
-        point3: D2D_POINT_2F { x: 18.0, y: 10.0 },
-    });
-    sink.AddBezier(&D2D1_BEZIER_SEGMENT {
-        point1: D2D_POINT_2F { x: 18.0, y: 15.5 },
-        point2: D2D_POINT_2F { x: 15.5, y: 18.0 },
-        point3: D2D_POINT_2F { x: 10.0, y: 18.0 },
-    });
-    // Handle
-    sink.AddLine(D2D_POINT_2F { x: 16.0, y: 24.0 });
-    sink.AddLine(D2D_POINT_2F { x: 19.0, y: 21.0 });
-    sink.AddLine(D2D_POINT_2F { x: 14.0, y: 16.0 });
-    sink.AddBezier(&D2D1_BEZIER_SEGMENT {
-        point1: D2D_POINT_2F { x: 4.5, y: 18.0 },
-        point2: D2D_POINT_2F { x: 2.0, y: 15.5 },
-        point3: D2D_POINT_2F { x: 2.0, y: 10.0 },
-    });
-    sink.AddBezier(&D2D1_BEZIER_SEGMENT {
-        point1: D2D_POINT_2F { x: 2.0, y: 4.5 },
-        point2: D2D_POINT_2F { x: 4.5, y: 2.0 },
-        point3: D2D_POINT_2F { x: 10.0, y: 2.0 },
-    });
-    sink.EndFigure(D2D1_FIGURE_END_CLOSED);
-    sink.Close()?;
-
-    Ok(geo)
 }

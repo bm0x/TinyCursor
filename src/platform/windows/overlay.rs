@@ -10,11 +10,12 @@ use super::sys::{
     GetProcAddress, HMENU, HINSTANCE, PeekMessageW, RegisterClassExW, SetProcessDpiAwarenessContext,
     SetWindowPos, ShowWindow, TranslateMessage, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, HWND,
     HWND_TOPMOST, LPARAM, LRESULT, MSG, PM_REMOVE, SW_SHOW, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
-    SWP_SHOWWINDOW, WNDCLASSEXW, WM_QUIT, WPARAM,
+    SWP_NOOWNERZORDER, SWP_SHOWWINDOW, WNDCLASSEXW, WM_QUIT, WPARAM,
     WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_NOREDIRECTIONBITMAP, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
     WS_EX_TRANSPARENT, WS_POPUP, ZBID_IMMERSIVE_NOTIFICATION, ZBID_SYSTEM_TOOLS,
     ZBID_UIACCESS, GetSystemMetrics, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN,
-    SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN,
+    SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN, HTTRANSPARENT, MA_NOACTIVATE, WM_DESTROY,
+    WM_MOUSEACTIVATE, WM_NCHITTEST, WM_SETCURSOR,
 };
 
 type PfnCreateWindowInBand = unsafe extern "system" fn(
@@ -49,7 +50,21 @@ unsafe extern "system" fn window_proc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    DefWindowProcW(hwnd, msg, wparam, lparam)
+    match msg {
+        // HTTRANSPARENT (-1) tells the Windows Input Manager that this window is 100%
+        // non-existent for hit-testing, routing all clicks, touches, pen, and gestures
+        // immediately to whatever window or desktop element is beneath it.
+        WM_NCHITTEST => HTTRANSPARENT,
+        // MA_NOACTIVATE (3) ensures clicks never steal focus or activate the overlay.
+        WM_MOUSEACTIVATE => MA_NOACTIVATE,
+        // Handled to prevent OS default cursor overrides.
+        WM_SETCURSOR => 0,
+        WM_DESTROY => {
+            super::sys::PostQuitMessage(0);
+            0
+        }
+        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+    }
 }
 
 /// A native Windows transparent overlay window.
@@ -199,8 +214,8 @@ impl OverlayWindow {
             // Extended styles for DirectComposition:
             // WS_EX_NOREDIRECTIONBITMAP tells DWM not to create a GDI bitmap,
             // delegating composition directly to the DirectX SwapChain.
+            // Hit-testing is handled cleanly via WM_NCHITTEST -> HTTRANSPARENT.
             let ex_style = WS_EX_TOPMOST
-                | WS_EX_TRANSPARENT
                 | WS_EX_NOREDIRECTIONBITMAP
                 | WS_EX_TOOLWINDOW
                 | WS_EX_NOACTIVATE;
@@ -303,6 +318,25 @@ impl OverlayWindow {
     #[inline]
     pub fn hwnd(&self) -> HWND {
         self.hwnd
+    }
+
+    /// Continuously reinforces HWND_TOPMOST priority so the cursor stays above
+    /// the Windows Taskbar, Start Menu, and all full-screen or foreground windows.
+    #[inline]
+    pub fn reinforce_topmost(&self) {
+        unsafe {
+            if !self.hwnd.is_null() {
+                SetWindowPos(
+                    self.hwnd,
+                    HWND_TOPMOST,
+                    0,
+                    0,
+                    0,
+                    0,
+                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_SHOWWINDOW,
+                );
+            }
+        }
     }
 
     /// Pumps pending Windows messages. Returns `false` if WM_QUIT was encountered.

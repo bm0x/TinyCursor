@@ -214,7 +214,7 @@ fn run_dxgi_loop(
         // G. Select cursor kind: Dynamic OS detection or Tray override
         let cursor_kind = match tray.design_override() {
             CursorDesignOverride::Auto => {
-                detect_system_cursor(current_target, is_clicking, tray.is_hand_on_click_enabled())
+                detect_system_cursor(current_target, is_clicking, tray.is_hand_on_click_enabled(), overlay.hwnd())
             }
             CursorDesignOverride::Arrow => RenderCursorKind::Arrow,
             CursorDesignOverride::Hand => RenderCursorKind::Hand,
@@ -368,7 +368,7 @@ fn run_gdi_loop(
 
         // J. Select cursor kind: Dynamic OS detection or Tray override
         let cursor_kind = match tray.design_override() {
-            CursorDesignOverride::Auto => detect_system_cursor(current_target, is_clicking, tray.is_hand_on_click_enabled()),
+            CursorDesignOverride::Auto => detect_system_cursor(current_target, is_clicking, tray.is_hand_on_click_enabled(), overlay.hwnd()),
             CursorDesignOverride::Arrow => RenderCursorKind::Arrow,
             CursorDesignOverride::Hand => RenderCursorKind::Hand,
             CursorDesignOverride::IBeam => RenderCursorKind::IBeam,

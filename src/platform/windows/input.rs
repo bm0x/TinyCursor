@@ -5,8 +5,9 @@ use crate::core::math::Vec2;
 use super::renderer::RenderCursorKind;
 use super::sys::{
     GetAsyncKeyState, GetClassNameW, GetCursorPos, GetDC, GetDeviceCaps, GetPixel,
-    GetWindowLongW, GetWindowRect, ReleaseDC, WindowFromPoint, CLR_INVALID, GWL_STYLE,
-    POINT, RECT, VK_CONTROL, VK_ESCAPE, VK_LBUTTON, VK_MENU, VK_SHIFT, VREFRESH, WS_THICKFRAME,
+    GetWindow, GetWindowLongW, GetWindowRect, ReleaseDC, WindowFromPoint, CLR_INVALID,
+    GWL_STYLE, GW_HWNDNEXT, HWND, POINT, RECT, VK_CONTROL, VK_ESCAPE, VK_LBUTTON,
+    VK_MENU, VK_SHIFT, VREFRESH, WS_THICKFRAME,
 };
 
 /// Queries the real hardware mouse cursor position in virtual screen coordinates.
@@ -108,14 +109,25 @@ pub fn get_max_display_frequency() -> u32 {
 
 /// Detects the active system cursor design using zero-message geometry and class detection.
 /// Never sends cross-process window messages (preventing WinUI / Microsoft Store memory recursion & lag).
-pub fn detect_system_cursor(pos: Vec2, is_clicking: bool, is_hand_on_click: bool) -> RenderCursorKind {
+pub fn detect_system_cursor(
+    pos: Vec2,
+    is_clicking: bool,
+    is_hand_on_click: bool,
+    overlay_hwnd: HWND,
+) -> RenderCursorKind {
     let pt = POINT {
         x: pos.x as i32,
         y: pos.y as i32,
     };
 
     unsafe {
-        let hwnd = WindowFromPoint(pt);
+        let mut hwnd = WindowFromPoint(pt);
+        // If WindowFromPoint hits our own overlay window, skip down the Z-order
+        // to discover the real underlying application window (Notepad, Chrome, Store, etc.)
+        while !hwnd.is_null() && hwnd == overlay_hwnd {
+            hwnd = GetWindow(hwnd, GW_HWNDNEXT);
+        }
+
         if !hwnd.is_null() {
             let style = GetWindowLongW(hwnd, GWL_STYLE) as u32;
             // Only resizable windows have resize borders

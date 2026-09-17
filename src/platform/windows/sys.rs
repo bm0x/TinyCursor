@@ -152,6 +152,13 @@ pub const SWP_NOOWNERZORDER: u32 = 0x0200;
 pub const SW_HIDE: i32 = 0;
 pub const SW_SHOW: i32 = 5;
 pub const PM_REMOVE: u32 = 0x0001;
+pub const WM_DESTROY: u32 = 0x0002;
+pub const WM_SETCURSOR: u32 = 0x0020;
+pub const WM_MOUSEACTIVATE: u32 = 0x0021;
+pub const MA_NOACTIVATE: isize = 3;
+pub const WM_NCHITTEST: u32 = 0x0084;
+pub const HTTRANSPARENT: isize = -1;
+pub const GW_HWNDNEXT: u32 = 2;
 pub const WM_QUIT: u32 = 0x0012;
 pub const WM_APP: u32 = 0x8000;
 pub const WM_COMMAND: u32 = 0x0111;
@@ -211,6 +218,7 @@ extern "system" {
     pub fn ReleaseDC(h_wnd: HWND, h_dc: HDC) -> i32;
     pub fn GetCursorPos(lp_point: *mut POINT) -> BOOL;
     pub fn WindowFromPoint(point: POINT) -> HWND;
+    pub fn GetWindow(h_wnd: HWND, u_cmd: u32) -> HWND;
     pub fn SendMessageTimeoutW(
         h_wnd: HWND,
         msg: u32,
@@ -351,7 +359,6 @@ extern "system" {
 
 pub const CLR_INVALID: u32 = 0xFFFFFFFF;
 pub const VREFRESH: i32 = 116;
-pub const WM_NCHITTEST: u32 = 0x0084;
 pub const SMTO_ABORTIFHUNG: u32 = 0x0002;
 pub const CURSOR_SHOWING: u32 = 0x00000001;
 pub const CURSOR_SUPPRESSED: u32 = 0x00000002;

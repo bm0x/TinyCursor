@@ -1,0 +1,14 @@
+# Ignore Rust project files for Vercel deployment
+Cargo.toml
+Cargo.lock
+src/
+target/
+tools/
+.github/
+installer.iss
+build.bat
+build.ps1
+install.bat
+install.ps1
+uninstall.ps1
+assets/

@@ -1,5 +1,5 @@
 {
+  "buildCommand": "echo 'Deploying static landing page'",
   "outputDirectory": "web",
-  "cleanUrls": true,
-  "framework": null
+  "cleanUrls": true
 }

@@ -69,26 +69,60 @@
     </div>
   </header>
 
+  <!-- Global Smooth Cursor (Magic UI Style) -->
+  <div id="smooth-cursor" class="smooth-cursor" aria-hidden="true">
+    <img id="cursor-img" src="assets/cursor_arrow.png" alt="" width="34" height="34">
+  </div>
+
   <!-- Interactive Demo Section -->
   <section id="interactive-demo" class="demo-section">
     <div class="container">
       <div class="section-header">
-        <span class="section-tag">Interactive Preview</span>
-        <h2>Experience Spring Physics in Real-Time</h2>
-        <p>Move your mouse inside the test canvas below to feel the natural spring elasticity and contrast morphing.</p>
+        <span class="section-tag">Live Playground</span>
+        <h2>Move Your Mouse Across the Screen</h2>
+        <p>The smooth spring physics follows your real pointer everywhere. Test how it adapts to light vs. dark surfaces and interactive elements below.</p>
       </div>
 
-      <div class="canvas-container" id="interactive-canvas">
-        <div class="split-bg">
-          <div class="split-side light-side"><span>Light Surface</span></div>
-          <div class="split-side dark-side"><span>Dark Surface</span></div>
+      <div class="playground-grid">
+        <!-- Light Surface Card -->
+        <div class="test-card test-light">
+          <div class="test-header">
+            <span class="card-badge badge-dark">Light Background</span>
+            <span class="card-status">Morphs to Obsidian Black</span>
+          </div>
+          <p class="test-desc">When hovering over this bright card, TinyCursor dynamically morphs into high-contrast black.</p>
+          <button class="test-btn btn-light-theme">Hover this button</button>
         </div>
-        <div id="virtual-cursor" class="virtual-cursor">
-          <svg id="cursor-svg" width="36" height="36" viewBox="0 0 36 36" fill="none">
-            <path id="cursor-body" d="M4 4L13.5 28L18 19L27 17.5L4 4Z" fill="#FFFFFF" stroke="#10131A" stroke-width="2" stroke-linejoin="round"/>
-          </svg>
+
+        <!-- Dark Surface Card -->
+        <div class="test-card test-dark">
+          <div class="test-header">
+            <span class="card-badge badge-cyan">Dark Background</span>
+            <span class="card-status">Morphs to Arctic White</span>
+          </div>
+          <p class="test-desc">Over deep obsidian surfaces, the pointer transitions seamlessly into crisp Arctic White.</p>
+          <button class="test-btn btn-dark-theme">Click to test squash</button>
         </div>
-        <div class="canvas-hint">Hover and move mouse around to see physics trailing & dynamic color adaptation</div>
+      </div>
+
+      <!-- Real-Time Metrics HUD -->
+      <div class="metrics-hud">
+        <div class="metric-item">
+          <span class="metric-label">Hardware Mouse</span>
+          <span class="metric-value" id="hud-raw-pos">X: 0 | Y: 0</span>
+        </div>
+        <div class="metric-item">
+          <span class="metric-label">Smooth Cursor</span>
+          <span class="metric-value" id="hud-smooth-pos">X: 0 | Y: 0</span>
+        </div>
+        <div class="metric-item">
+          <span class="metric-label">Dynamic Velocity</span>
+          <span class="metric-value" id="hud-speed">0 px/s</span>
+        </div>
+        <div class="metric-item">
+          <span class="metric-label">Active State</span>
+          <span class="metric-value" id="hud-state">Arrow (White)</span>
+        </div>
       </div>
     </div>
   </section>

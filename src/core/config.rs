@@ -54,11 +54,11 @@ pub struct CursorConfig {
 impl Default for CursorConfig {
     fn default() -> Self {
         Self {
-            stiffness: 750.0,
-            damping: 54.0,
+            stiffness: 1024.0,
+            damping: 46.08,
             max_velocity: 3200.0,
-            stretch_factor: 0.22,
-            min_rotation_speed: 15.0,
+            stretch_factor: 0.35,
+            min_rotation_speed: 20.0,
             cursor_size: 24.0,
             color_fill: [0.08, 0.08, 0.10, 0.95],
             color_stroke: [1.0, 1.0, 1.0, 0.98],

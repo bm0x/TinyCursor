@@ -11,9 +11,10 @@ use super::sys::{
     SetWindowPos, ShowWindow, TranslateMessage, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, HWND,
     HWND_TOPMOST, LPARAM, LRESULT, MSG, PM_REMOVE, SW_SHOW, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
     SWP_SHOWWINDOW, WNDCLASSEXW, WM_QUIT, WPARAM,
-    WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
+    WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_NOREDIRECTIONBITMAP, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
     WS_EX_TRANSPARENT, WS_POPUP, ZBID_IMMERSIVE_NOTIFICATION, ZBID_SYSTEM_TOOLS,
-    ZBID_UIACCESS,
+    ZBID_UIACCESS, GetSystemMetrics, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN,
+    SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN,
 };
 
 type PfnCreateWindowInBand = unsafe extern "system" fn(
@@ -176,6 +177,125 @@ impl OverlayWindow {
             );
 
             Some(Self { hwnd })
+        }
+    }
+
+    /// Creates and initializes a transparent full-desktop overlay window
+    /// designed specifically for DirectComposition and DXGI Modern Flip Model.
+    /// Returns (OverlayWindow, vx, vy, width, height) covering all active displays.
+    pub fn new_direct_composition() -> Option<(Self, i32, i32, u32, u32)> {
+        unsafe {
+            SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+            let hinstance = GetModuleHandleW(null_mut());
+
+            let mut wc: WNDCLASSEXW = std::mem::zeroed();
+            wc.cb_size = std::mem::size_of::<WNDCLASSEXW>() as u32;
+            wc.lpfn_wnd_proc = Some(window_proc);
+            wc.h_instance = hinstance;
+            wc.lpsz_class_name = WINDOW_CLASS_NAME.as_ptr();
+
+            RegisterClassExW(&wc);
+
+            // Extended styles for DirectComposition:
+            // WS_EX_NOREDIRECTIONBITMAP tells DWM not to create a GDI bitmap,
+            // delegating composition directly to the DirectX SwapChain.
+            let ex_style = WS_EX_TOPMOST
+                | WS_EX_TRANSPARENT
+                | WS_EX_NOREDIRECTIONBITMAP
+                | WS_EX_TOOLWINDOW
+                | WS_EX_NOACTIVATE;
+
+            let vx = GetSystemMetrics(SM_XVIRTUALSCREEN);
+            let vy = GetSystemMetrics(SM_YVIRTUALSCREEN);
+            let vw = (GetSystemMetrics(SM_CXVIRTUALSCREEN) as u32).max(1920);
+            let vh = (GetSystemMetrics(SM_CYVIRTUALSCREEN) as u32).max(1080);
+
+            // Dynamically query CreateWindowInBand and SetWindowBand from user32.dll
+            let user32_name: &[u16] = &[
+                b'u' as u16, b's' as u16, b'e' as u16, b'r' as u16,
+                b'3' as u16, b'2' as u16, b'.' as u16, b'd' as u16,
+                b'l' as u16, b'l' as u16, 0,
+            ];
+            let user32_mod = GetModuleHandleW(user32_name.as_ptr());
+            let mut p_create_in_band: Option<PfnCreateWindowInBand> = None;
+            let mut p_set_window_band: Option<PfnSetWindowBand> = None;
+
+            if !user32_mod.is_null() {
+                let p_create = GetProcAddress(user32_mod, b"CreateWindowInBand\0".as_ptr());
+                if !p_create.is_null() {
+                    p_create_in_band = Some(std::mem::transmute(p_create));
+                }
+                let p_set = GetProcAddress(user32_mod, b"SetWindowBand\0".as_ptr());
+                if !p_set.is_null() {
+                    p_set_window_band = Some(std::mem::transmute(p_set));
+                }
+            }
+
+            let mut hwnd: HWND = null_mut();
+
+            // 1. Try elevated Z-Bands (ZBID_UIACCESS = 12, ZBID_SYSTEM_TOOLS = 11)
+            if let Some(create_in_band) = p_create_in_band {
+                for &target_band in &[ZBID_UIACCESS, ZBID_SYSTEM_TOOLS, ZBID_IMMERSIVE_NOTIFICATION] {
+                    hwnd = create_in_band(
+                        ex_style,
+                        WINDOW_CLASS_NAME.as_ptr(),
+                        WINDOW_CLASS_NAME.as_ptr(),
+                        WS_POPUP,
+                        vx,
+                        vy,
+                        vw as i32,
+                        vh as i32,
+                        null_mut(),
+                        null_mut(),
+                        hinstance,
+                        null_mut(),
+                        target_band,
+                    );
+                    if !hwnd.is_null() {
+                        break;
+                    }
+                }
+            }
+
+            // 2. Standard CreateWindowExW fallback
+            if hwnd.is_null() {
+                hwnd = CreateWindowExW(
+                    ex_style,
+                    WINDOW_CLASS_NAME.as_ptr(),
+                    WINDOW_CLASS_NAME.as_ptr(),
+                    WS_POPUP,
+                    vx,
+                    vy,
+                    vw as i32,
+                    vh as i32,
+                    null_mut(),
+                    null_mut(),
+                    hinstance,
+                    null_mut(),
+                );
+            }
+
+            if hwnd.is_null() {
+                return None;
+            }
+
+            // 3. Reinforce band placement if SetWindowBand is available
+            if let Some(set_band) = p_set_window_band {
+                let _ = set_band(hwnd, null_mut(), ZBID_UIACCESS);
+            }
+
+            ShowWindow(hwnd, SW_SHOW);
+            SetWindowPos(
+                hwnd,
+                HWND_TOPMOST,
+                vx,
+                vy,
+                vw as i32,
+                vh as i32,
+                SWP_NOACTIVATE | SWP_SHOWWINDOW,
+            );
+
+            Some((Self { hwnd }, vx, vy, vw, vh))
         }
     }
 

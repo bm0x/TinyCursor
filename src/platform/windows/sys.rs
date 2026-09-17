@@ -128,8 +128,17 @@ pub const WS_EX_TRANSPARENT: u32 = 0x00000020;
 pub const WS_EX_LAYERED: u32 = 0x00080000;
 pub const WS_EX_TOOLWINDOW: u32 = 0x00000080;
 pub const WS_EX_NOACTIVATE: u32 = 0x08000000;
+pub const WS_EX_NOREDIRECTIONBITMAP: u32 = 0x00200000;
 pub const GWL_STYLE: i32 = -16;
 pub const WS_THICKFRAME: u32 = 0x00040000;
+
+// System Metrics Constants
+pub const SM_CXSCREEN: i32 = 0;
+pub const SM_CYSCREEN: i32 = 1;
+pub const SM_XVIRTUALSCREEN: i32 = 76;
+pub const SM_YVIRTUALSCREEN: i32 = 77;
+pub const SM_CXVIRTUALSCREEN: i32 = 78;
+pub const SM_CYVIRTUALSCREEN: i32 = 79;
 
 // SetWindowPos Constants
 pub const HWND_TOPMOST: HWND = -1isize as *mut c_void;
@@ -216,6 +225,7 @@ extern "system" {
     pub fn GetWindowLongW(h_wnd: HWND, n_index: i32) -> i32;
     pub fn GetCursorInfo(pci: *mut CURSORINFO) -> BOOL;
     pub fn GetAsyncKeyState(v_key: i32) -> i16;
+    pub fn GetSystemMetrics(n_index: i32) -> i32;
     pub fn CreateWindowExW(
         dw_ex_style: u32,
         lp_class_name: *const u16,

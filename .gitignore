@@ -1,0 +1,21 @@
+# Rust build artifacts
+/target/
+**/*.rs.bk
+Cargo.lock
+
+# Windows intermediate resources and certificates
+*.res
+*.cer
+*.pfx
+*.key
+*.etl
+sxs.txt
+
+# Inno Setup output
+/Output/
+
+# IDE / Editor files
+.idea/
+.vscode/
+*.swp
+*.bak

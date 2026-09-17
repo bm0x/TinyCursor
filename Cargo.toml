@@ -1,0 +1,17 @@
+[package]
+name = "tiny-cursor"
+version = "0.1.0"
+edition = "2021"
+authors = ["TinyCursor Team"]
+description = "High-performance smooth cursor with spring physics for desktop"
+
+[dependencies]
+# Pure native implementation with zero external crates for instant compilation,
+# maximum security, and sub-millisecond responsiveness.
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

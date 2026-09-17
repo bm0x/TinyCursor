@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2021"
 authors = ["TinyCursor Team"]
 description = "High-performance smooth cursor with spring physics for desktop"
+license = "MIT"
+repository = "https://github.com/bm0x/TinyCursor"
+homepage = "https://tinycursor.vercel.app"
 
 [dependencies]
 # Pure native implementation with zero external crates for instant compilation,

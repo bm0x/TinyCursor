@@ -1,75 +1,101 @@
 # TinyCursor 🚀
-> Utilidad nativa de escritorio para **Smooth Cursor** con físicas de resortes (*spring dynamics*), rotación reactiva hacia el vector de velocidad, deformación elástica (*squash & stretch*) y diseño **Modern White**.
+> High-performance native desktop smooth cursor engine with critically damped spring dynamics, real-time refresh rate synchronization, and 14 adaptive dual-theme designs. Built in 100% pure native Rust.
 
-Inspirado en la especificación técnica de [Magic UI / Framer Motion](https://magicui.design/docs/components/smooth-cursor) y los cursores [Modern White](https://cdn.custom-cursor.com/cursors/modern_white.png), implementado en **Rust puro de ultra-bajo nivel** sin dependencias externas.
+[![CI](https://github.com/rafy2/TinyCursor/actions/workflows/ci.yml/badge.svg)](https://github.com/rafy2/TinyCursor/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011%20(64--bit)-lightgrey.svg)]()
+[![Rust](https://img.shields.io/badge/Rust-2021%20Edition-orange.svg)]()
 
----
-
-## ✨ Características Principales
-
-* **Diseño Modern White (Flecha y Mano):**
-  * **Cursor Normal (Flecha):** Silueta nítida blanca con borde oscuro redondeado y sombra suave (*drop shadow*), con rotación dinámica según el vector de movimiento y deformación elástica (*squash & stretch*).
-  * **Cursor en Clic (Mano):** Se transforma automáticamente en la mano indicadora Modern White al hacer clic o interactuar, con micro-animación táctil de pulsación.
-* **100% Visible sobre la Barra de Tareas e Íconos:**
-  * Refuerzo continuo de banda Z-Order (`HWND_TOPMOST`), evitando que la barra de tareas de Windows (`Shell_TrayWnd`), el menú de inicio o los iconos del escritorio oculten el cursor.
-* **Aplicación en Segundo Plano (Sin ventana de terminal):**
-  * Compilado con `#![windows_subsystem = "windows"]`. Se ejecuta silenciosamente en segundo plano como Discord, Epic Games o Spotify.
-* **Ícono en la Bandeja del Sistema (Taskbar System Tray):**
-  * Muestra el ícono personalizado Modern White en la bandeja de notificaciones (junto al reloj).
-  * **Menú contextual con clic derecho:**
-    * *⏸ Pausar / ▶ Reanudar:* Restaura temporalmente el cursor normal de Windows para tareas que requieran el puntero nativo.
-    * *👆 Mano en Clic:* Activa o desactiva la transformación en mano durante clics.
-    * *✕ Salir:* Restaura inmediatamente todos los cursores y finaliza el proceso de forma segura.
-  * **Clic izquierdo:** Alterna rápidamente entre pausar y reanudar.
-* **Rendimiento Extremo:**
-  * Tamaño del binario: **~310 KB**.
-  * Consumo de CPU: **0.0% en reposo**, < 0.5% en movimiento activo.
-  * Tasa de refresco: Compatible con monitores de 60 Hz, 144 Hz, 240 Hz y 360 Hz.
-  * Click-through total sin latencia de entrada (`WS_EX_TRANSPARENT | WS_EX_LAYERED`).
-* **Protección Fail-Safe:**
-  * Oculta los cursores nativos del sistema y garantiza su restauración inmediata mediante RAII, manejador de pánicos o el atajo de emergencia **`Ctrl + Shift + Esc`**.
+Website: **[https://tinycursor.vercel.app](https://tinycursor.vercel.app)**
 
 ---
 
-## 🛠️ Arquitectura
+## ✨ Features
+
+* **⚡ 288Hz+ Ultra-High Polling Rate:**
+  * Dynamically detects your display's hardware refresh rate (60Hz, 144Hz, 240Hz, 360Hz) and paces physics updates at $2\times$ screen Hz.
+  * Unlocks 1ms high-precision Windows multimedia timer (`timeBeginPeriod(1)`) for sub-millisecond input latency.
+* **🧲 Critically Damped Spring Dynamics:**
+  * Euler semi-implicit integration with dynamic sub-stepping at 500 Hz ($\zeta \approx 0.986$, $k = 750$). Eliminates jitter and unnatural bouncing while maintaining organic physical trailing.
+* **🎨 14 Adaptive Dual-Theme Designs:**
+  * Full suite of handcrafted pointers in Arctic White and Obsidian Black:
+    * Standard Arrow, Link Hand Pointer, Help, Wait, Crosshair, Text I-Beam, Pencil.
+    * 4-Axis Window Resizing (`resize_ns`, `resize_we`, `resize_nwse`, `resize_nesw`).
+    * Move & Pan, Zoom In (+), Zoom Out (-), Unavailable.
+  * Real-time background luminance sampling: seamlessly morphs color to maintain 100% readability across light and dark surfaces.
+* **🪟 Universal Overlay (UIAccess & Band Integration):**
+  * Floats smoothly over Windows desktop, taskbar, Start Menu, Notification Center, and fullscreen windows.
+* **🦀 100% Pure Native Rust:**
+  * Zero heavy runtime frameworks (no Electron, no Chromium).
+  * Consumes under 15 MB of RAM and $<0.2\%$ CPU in active movement (0.0% in idle mode).
+* **🛡️ Privacy-First & 100% Open Source:**
+  * Fully transparent under the permissive MIT license.
+  * Zero telemetry, zero cloud tracking, zero network activity.
+
+---
+
+## 📦 Installation
+
+### Option 1: Automated Windows Installer (.exe)
+Download the latest `TinyCursor-Setup-x64.exe` from [GitHub Releases](https://github.com/rafy2/TinyCursor/releases/latest).
+The Inno Setup wizard installs TinyCursor in `C:\Program Files\TinyCursor` with optional auto-start on Windows boot.
+
+### Option 2: Portable (.zip)
+Download `TinyCursor-Portable-x64.zip`, extract anywhere, and run `tiny-cursor.exe`.
+
+### Option 3: Build from Source
+```bash
+# Clone the repository
+git clone https://github.com/rafy2/TinyCursor.git
+cd TinyCursor
+
+# Run unit tests
+cargo test
+
+# Build optimized release binary
+cargo build --release
+```
+
+---
+
+## 🛠️ Architecture
 
 ```
 TinyCursor/
-├── Cargo.toml                                 # Configuración sin dependencias externas
-├── assets/
-│   ├── arrow.png                              # Sprite Modern White Arrow
-│   ├── hand.png                               # Sprite Modern White Hand
-│   └── app_icon.ico                           # Ícono de aplicación para Windows
+├── .github/
+│   └── workflows/
+│       ├── ci.yml                             # Automated testing on Windows
+│       └── release.yml                        # Automated Inno Setup + SignPath release pipeline
+├── Cargo.toml                                 # Zero external dependencies
+├── LICENSE                                    # OSI-approved MIT License
+├── installer.iss                              # Inno Setup 6 packaging script
+├── vercel.json                                # Vercel landing page deployment config
+├── web/                                       # Project landing page & interactive preview
+├── assets/                                    # 14 Dual-theme cursor sprites
+├── tools/                                     # Diagnostic, resource, and test utilities
 └── src/
-    ├── main.rs                                # Loop de 240 Hz, GUI background y tray integration
-    ├── core/                                  # CORE MATEMÁTICO (Multiplataforma)
-    │   ├── mod.rs
-    │   ├── math.rs                            # Vectores 2D, rotación angular y squash & stretch
-    │   ├── physics.rs                         # Integración de Euler semi-implícita + sub-stepping
-    │   ├── config.rs                          # Calibración de rigidez, amortiguación y elasticidad
-    │   └── state.rs                           # Estados visuales del cursor
-    └── platform/windows/                      # PLATAFORMA WINDOWS (Nativo Puro)
-        ├── mod.rs
-        ├── assets.rs                          # Texturas compiladas en memoria (0 lecturas a disco)
-        ├── sys.rs                             # Enlace directo FFI (user32, gdi32, shell32, winmm)
-        ├── overlay.rs                         # Ventana transparente WS_EX_TRANSPARENT + Topmost
-        ├── tray.rs                            # Gestor de ícono en bandeja y menú contextual
-        ├── cursor_guard.rs                    # Ocultación + Fail-Safe de cursor
-        ├── input.rs                           # Polling de alta velocidad y detección de clic
-        └── renderer.rs                        # Muestreo bilineal con drop shadow y DWM composition
+    ├── main.rs                                # Entrypoint, refresh rate pacing, event loop
+    ├── core/                                  # 100% Platform-agnostic mathematical core
+    │   ├── math.rs                            # 2D Vectors, angles, squash & stretch
+    │   ├── physics.rs                         # Euler semi-implicit spring dynamics
+    │   └── config.rs                          # Calibrated stiffness and damping
+    └── platform/windows/                      # Windows native backend
+        ├── assets.rs                          # Pre-compiled ARGB bitmap memory arrays
+        ├── overlay.rs                         # Transparent layered window
+        ├── tray.rs                            # Taskbar system tray menu
+        ├── input.rs                           # Cursor context detection & click states
+        └── renderer.rs                        # Bilinear sampling & DWM composition
 ```
 
 ---
 
-## ⚡ Ejecución
+## 🔐 Privacy Policy
 
-Para iniciar TinyCursor en segundo plano:
+TinyCursor does not collect, record, or transmit any user data, screen content, keystrokes, or personal information. All luminance sampling for contrast adaptation occurs strictly in local RAM around the cursor position and is discarded every frame. The application works completely offline.
 
-```powershell
-cargo run --release
-```
+---
 
-O haciendo doble clic directamente sobre:
-`target\release\tiny-cursor.exe`
+## 📄 License
 
-Aparecerá el ícono de TinyCursor en la bandeja del sistema en la barra de tareas.
+This project is licensed under the [MIT License](LICENSE).
+Code signing provided by the [SignPath Foundation](https://signpath.org) for open-source projects.

@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TinyCursor — High-Performance Smooth Cursor for Desktop</title>
+  <meta name="description" content="TinyCursor is an open-source, ultra-low latency smooth cursor engine with spring physics, adaptive dual-theme contrast, and multi-screen high-Hz pacing written in pure Rust.">
+  <link rel="icon" type="image/png" href="assets/app_icon.png">
+  <link rel="stylesheet" href="styles.css">
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Background Glows -->
+  <div class="glow glow-1"></div>
+  <div class="glow glow-2"></div>
+
+  <!-- Navigation -->
+  <nav class="navbar">
+    <div class="container nav-container">
+      <div class="logo">
+        <img src="assets/app_icon.png" alt="TinyCursor Logo" width="32" height="32">
+        <span>TinyCursor</span>
+      </div>
+      <div class="nav-links">
+        <a href="#features">Features</a>
+        <a href="#architecture">Architecture</a>
+        <a href="#interactive-demo">Live Demo</a>
+        <a href="#privacy">Privacy</a>
+        <a href="https://github.com/rafy2/TinyCursor" target="_blank" rel="noopener noreferrer" class="btn-github">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          GitHub
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <header class="hero">
+    <div class="container hero-content">
+      <div class="badge-pill">
+        <span class="badge-dot"></span>
+        <span>Open Source • Pure Native Rust • 144Hz - 360Hz Ready</span>
+      </div>
+      <h1 class="hero-title">
+        The Smooth, Fluid Cursor <br>
+        <span class="gradient-text">Engine for Desktop</span>
+      </h1>
+      <p class="hero-subtitle">
+        Supercharge your mouse pointer with critically damped spring physics, adaptive light/dark contrast morphing, and zero-latency refresh rate pacing. Lightweight, non-intrusive, and completely open source.
+      </p>
+      <div class="hero-actions">
+        <a href="https://github.com/rafy2/TinyCursor/releases/latest" class="btn btn-primary">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          Download for Windows (.exe)
+        </a>
+        <a href="https://github.com/rafy2/TinyCursor" class="btn btn-secondary">
+          Source Code (MIT)
+        </a>
+      </div>
+      <p class="hero-meta">Version 0.1.0 • Windows 10/11 (64-bit) • macOS & Linux in development</p>
+
+      <!-- Hero Preview Card -->
+      <div class="hero-preview-card">
+        <img src="assets/overview.png" alt="TinyCursor Multi-Design Suite Preview" class="preview-img">
+      </div>
+    </div>
+  </header>
+
+  <!-- Interactive Demo Section -->
+  <section id="interactive-demo" class="demo-section">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag">Interactive Preview</span>
+        <h2>Experience Spring Physics in Real-Time</h2>
+        <p>Move your mouse inside the test canvas below to feel the natural spring elasticity and contrast morphing.</p>
+      </div>
+
+      <div class="canvas-container" id="interactive-canvas">
+        <div class="split-bg">
+          <div class="split-side light-side"><span>Light Surface</span></div>
+          <div class="split-side dark-side"><span>Dark Surface</span></div>
+        </div>
+        <div id="virtual-cursor" class="virtual-cursor">
+          <svg id="cursor-svg" width="36" height="36" viewBox="0 0 36 36" fill="none">
+            <path id="cursor-body" d="M4 4L13.5 28L18 19L27 17.5L4 4Z" fill="#FFFFFF" stroke="#10131A" stroke-width="2" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="canvas-hint">Hover and move mouse around to see physics trailing & dynamic color adaptation</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features Section -->
+  <section id="features" class="features-section">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag">Engineering Highlights</span>
+        <h2>Built for Extreme Responsiveness</h2>
+        <p>Engineered without bulky runtime frameworks for instantaneous feedback and minimal CPU usage.</p>
+      </div>
+
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">⚡</div>
+          <h3>288Hz+ Ultra-High Polling</h3>
+          <p>Dynamically synchronizes with your display's native refresh rate using high-resolution Win32 multimedia timers (1ms) to eliminate jitter and stutter.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">🧲</div>
+          <h3>Critically Damped Physics</h3>
+          <p>Euler semi-implicit integration with dynamic sub-stepping (500Hz) ensures smooth organic trailing without oscillation or overshooting.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">🎨</div>
+          <h3>14 Adaptive Dual-Theme Designs</h3>
+          <p>Automatically interpolates between Obsidian Black and Arctic White based on background luminance, ensuring 100% readability anywhere on your screen.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">🦀</div>
+          <h3>100% Native Rust</h3>
+          <p>Zero external runtime dependencies. Consumes less than 15MB of RAM and negligible CPU power (<0.2%), sleeping when idle.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">🪟</div>
+          <h3>Total Layer Overlap</h3>
+          <p>Integrated UIAccess window band support allows smooth rendering above Start Menu, Notification Center, and full-screen environments.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">🛡️</div>
+          <h3>Privacy-First & Open Source</h3>
+          <p>Licensed under permissive MIT. Zero telemetry, zero cloud data collection, and zero network calls. All computations happen in local RAM.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Cursor Gallery Section -->
+  <section class="gallery-section">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag">Complete Asset Suite</span>
+        <h2>14 Custom Pointer Variants</h2>
+        <p>Every standard desktop cursor context is covered with custom handcrafted white and black sprites.</p>
+      </div>
+      <div class="gallery-card">
+        <img src="assets/clean_sheet.png" alt="TinyCursor 14 Dual-Theme Sprite Sheet" class="sheet-img">
+        <div class="gallery-labels">
+          <span>Arrow</span> • <span>Hand Pointer</span> • <span>Text I-Beam</span> • <span>Move</span> • <span>Resize 4-Axis</span> • <span>Zoom In / Out</span> • <span>Help</span> • <span>Crosshair</span> • <span>Wait</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Privacy Policy Section -->
+  <section id="privacy" class="privacy-section">
+    <div class="container">
+      <div class="privacy-box">
+        <div class="section-header" style="margin-bottom: 24px;">
+          <span class="section-tag">Security & Transparency</span>
+          <h2>Privacy Policy</h2>
+        </div>
+        <div class="privacy-content">
+          <p><strong>Last Updated: September 2026</strong></p>
+          <p>TinyCursor is dedicated to user privacy and open-source transparency. When using TinyCursor, you can be completely confident that:</p>
+          <ul>
+            <li><strong>No Personal Data Collection:</strong> TinyCursor does not collect, record, transmit, or monetize any personal information, keystrokes, clipboard data, or browsing activity.</li>
+            <li><strong>Local-Only Processing:</strong> Luminance sampling used for dynamic theme switching is performed strictly in real-time volatile memory (GPU/RAM) around the mouse pointer and is never saved to disk.</li>
+            <li><strong>Zero Network Calls:</strong> TinyCursor does not contain any analytics SDKs, trackers, telemetry beacons, or external network connections. It functions completely offline.</li>
+            <li><strong>Auditable Code:</strong> The entire codebase is open source under the MIT License and publicly verifiable on GitHub.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container footer-content">
+      <div class="footer-left">
+        <div class="logo">
+          <img src="assets/app_icon.png" alt="TinyCursor" width="24" height="24">
+          <span>TinyCursor</span>
+        </div>
+        <p>Free and open-source software under the MIT License.</p>
+      </div>
+      <div class="footer-right">
+        <a href="https://github.com/rafy2/TinyCursor" target="_blank" rel="noopener noreferrer">GitHub Repository</a>
+        <a href="https://github.com/rafy2/TinyCursor/releases" target="_blank" rel="noopener noreferrer">Releases</a>
+        <a href="#privacy">Privacy Policy</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

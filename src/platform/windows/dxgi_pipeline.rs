@@ -72,6 +72,7 @@ pub struct DxgiPipeline {
     offset_x: f32,
     offset_y: f32,
     animation_time: f32,
+    frame_counter: u64,
 }
 
 impl DxgiPipeline {
@@ -206,6 +207,7 @@ impl DxgiPipeline {
                 offset_x: vx as f32,
                 offset_y: vy as f32,
                 animation_time: 0.0,
+                frame_counter: 0,
             })
         }
     }
@@ -238,16 +240,19 @@ impl DxgiPipeline {
             // 2. Solve Spring Physics (Semi-implicit Euler + Squash & Stretch)
             physics.update(target_pos, delta_time);
 
-            // 3. Continuously reinforce HWND_TOPMOST priority over Taskbar and Shell
-            let _ = SetWindowPos(
-                self.hwnd,
-                HWND_TOPMOST,
-                0,
-                0,
-                0,
-                0,
-                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_SHOWWINDOW,
-            );
+            // 3. Reinforce HWND_TOPMOST priority periodically over Taskbar and Shell
+            if self.frame_counter % 120 == 0 {
+                let _ = SetWindowPos(
+                    self.hwnd,
+                    HWND_TOPMOST,
+                    0,
+                    0,
+                    0,
+                    0,
+                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_SHOWWINDOW,
+                );
+            }
+            self.frame_counter = self.frame_counter.wrapping_add(1);
 
             // 4. Begin Direct2D Hardware Drawing
             self.d2d_context.BeginDraw();
@@ -332,13 +337,13 @@ impl DxgiPipeline {
 
         // Base scale: 0.50 maps the 64x64 source texture to a sharp ~32px cursor
         let (draw_angle, sx, sy) = if is_arrow {
-            // Relative angle deviation from resting pose (-2.06 rad), clamped to +/- 28 degrees
-            const ARROW_BASE_ANGLE: f32 = -2.06;
-            let delta = (angle - ARROW_BASE_ANGLE + std::f32::consts::PI)
-                .rem_euclid(2.0 * std::f32::consts::PI) - std::f32::consts::PI;
-            let clamped_delta = delta.clamp(-0.48, 0.48);
+            // In the source sprite texture, the arrow points UP (-PI/2).
+            // Adding PI/2 aligns the arrow tip directly with the velocity trajectory (angle) in full 360 degrees.
+            // At canonical resting pose (-3*PI/4), draw_angle is -PI/4 (-45 deg, standard top-left).
+            let draw_angle = angle + std::f32::consts::FRAC_PI_2;
             let base_scale = 0.50;
-            (clamped_delta, scale_x * base_scale, scale_y * base_scale)
+            // Stretch along the arrow's length (Y in sprite space) and squash along width (X in sprite space)
+            (draw_angle, scale_y * base_scale, scale_x * base_scale)
         } else if is_hand {
             // Hand pointer always stays upright! Subtle click squash on button down
             let click_squash = if is_clicking { 0.90 } else { 1.0 };

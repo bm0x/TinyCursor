@@ -134,12 +134,12 @@ impl CursorSurface {
 
         match kind {
             RenderCursorKind::Arrow => {
-                // Continuous delta angle relative to the canonical top-left resting pose
-                let delta_angle = angle - ARROW_BASE_ANGLE;
+                // Align arrow tip with velocity trajectory in 360 degrees
+                let delta_angle = angle + std::f32::consts::FRAC_PI_2;
 
                 let base_scale = 0.50;
-                let sx = scale_x * base_scale;
-                let sy = scale_y * base_scale;
+                let sx = scale_y * base_scale;
+                let sy = scale_x * base_scale;
 
                 // 1. Soft drop shadow (offset down-right)
                 self.sample_and_blit(

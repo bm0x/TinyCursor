@@ -57,8 +57,6 @@ unsafe extern "system" fn window_proc(
         WM_NCHITTEST => HTTRANSPARENT,
         // MA_NOACTIVATE (3) ensures clicks never steal focus or activate the overlay.
         WM_MOUSEACTIVATE => MA_NOACTIVATE,
-        // Handled to prevent OS default cursor overrides.
-        WM_SETCURSOR => 0,
         WM_DESTROY => {
             super::sys::PostQuitMessage(0);
             0
@@ -216,6 +214,7 @@ impl OverlayWindow {
             // delegating composition directly to the DirectX SwapChain.
             // Hit-testing is handled cleanly via WM_NCHITTEST -> HTTRANSPARENT.
             let ex_style = WS_EX_TOPMOST
+                | WS_EX_TRANSPARENT
                 | WS_EX_NOREDIRECTIONBITMAP
                 | WS_EX_TOOLWINDOW
                 | WS_EX_NOACTIVATE;

@@ -28,12 +28,41 @@ use crate::platform::windows::{
 use crate::platform::windows::sys::{timeBeginPeriod, timeEndPeriod};
 
 fn main() {
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() >= 3 && args[1] == "--watchdog" {
+        if let Ok(pid) = args[2].parse::<u32>() {
+            #[cfg(target_os = "windows")]
+            run_watchdog(pid);
+            return;
+        }
+    }
+
     #[cfg(target_os = "windows")]
     run_windows();
 
     #[cfg(not(target_os = "windows"))]
     {
         println!("TinyCursor is currently implemented for Windows. macOS and Linux support is under development.");
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn run_watchdog(parent_pid: u32) {
+    use crate::platform::windows::sys::{
+        CloseHandle, OpenProcess, SystemParametersInfoW, WaitForSingleObject,
+        INFINITE, SPI_SETCURSORS, SYNCHRONIZE,
+    };
+    use std::ptr::null_mut;
+
+    unsafe {
+        let handle = OpenProcess(SYNCHRONIZE, 0, parent_pid);
+        if !handle.is_null() {
+            // Kernel-level wait: 0% CPU, wakes immediately when parent process exits, crashes, or is killed
+            WaitForSingleObject(handle, INFINITE);
+            CloseHandle(handle);
+        }
+        // Force immediate restoration of default Windows system cursors
+        SystemParametersInfoW(SPI_SETCURSORS, 0, null_mut(), 0);
     }
 }
 

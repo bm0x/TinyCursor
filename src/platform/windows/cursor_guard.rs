@@ -53,9 +53,10 @@ pub struct SystemCursorGuard {
 
 impl SystemCursorGuard {
     /// Creates a transparent 32x32 cursor and replaces all active system cursors.
-    /// Also installs an emergency panic hook to ensure restoration on abnormal exit.
+    /// Also installs crash filters, panic hooks, and spawns a background watchdog to guarantee cursor restoration.
     pub fn hide() -> Option<Self> {
-        install_panic_hook();
+        install_crash_handlers();
+        spawn_watchdog_process();
 
         // 32x32 1-bit cursor masks:
         // AND mask = 1 (preserve background)
@@ -103,14 +104,45 @@ impl Drop for SystemCursorGuard {
     }
 }
 
-/// Installs a panic hook that immediately restores system cursors before unwinding.
-fn install_panic_hook() {
+unsafe extern "system" fn unhandled_crash_callback(_: *mut std::ffi::c_void) -> i32 {
+    unsafe {
+        SystemParametersInfoW(SPI_SETCURSORS, 0, std::ptr::null_mut(), 0);
+    }
+    0 // EXCEPTION_CONTINUE_SEARCH
+}
+
+/// Installs both SEH crash filters and Rust panic hooks to ensure immediate restoration on abnormal crash.
+fn install_crash_handlers() {
     static HOOK_SET: AtomicBool = AtomicBool::new(false);
     if !HOOK_SET.swap(true, Ordering::SeqCst) {
+        unsafe {
+            super::sys::SetUnhandledExceptionFilter(unhandled_crash_callback as *const _);
+        }
         let prev_hook = std::panic::take_hook();
         std::panic::set_hook(Box::new(move |info| {
             restore_system_cursors();
             prev_hook(info);
         }));
+    }
+}
+
+/// Spawns an independent, detached watchdog process that waits for the parent PID handle.
+/// If the main process is killed forcibly by Task Manager or an unrecoverable hard crash,
+/// the watchdog immediately restores standard Windows cursors.
+fn spawn_watchdog_process() {
+    static WATCHDOG_STARTED: AtomicBool = AtomicBool::new(false);
+    if !WATCHDOG_STARTED.swap(true, Ordering::SeqCst) {
+        if let Ok(exe_path) = std::env::current_exe() {
+            let my_pid = unsafe { super::sys::GetCurrentProcessId() };
+            use std::os::windows::process::CommandExt;
+            const CREATE_NO_WINDOW: u32 = 0x08000000;
+            const DETACHED_PROCESS: u32 = 0x00000008;
+
+            let _ = std::process::Command::new(exe_path)
+                .arg("--watchdog")
+                .arg(my_pid.to_string())
+                .creation_flags(CREATE_NO_WINDOW | DETACHED_PROCESS)
+                .spawn();
+        }
     }
 }

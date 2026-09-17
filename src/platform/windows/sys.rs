@@ -337,7 +337,16 @@ extern "system" {
     pub fn GetProcAddress(h_module: HINSTANCE, lp_proc_name: *const u8) -> *mut c_void;
     pub fn LoadLibraryW(lp_lib_file_name: *const u16) -> HINSTANCE;
     pub fn FreeLibrary(h_lib_module: HINSTANCE) -> BOOL;
+    pub fn GetCurrentProcessId() -> u32;
+    pub fn OpenProcess(dw_desired_access: u32, b_inherit_handle: BOOL, dw_process_id: u32) -> HANDLE;
+    pub fn WaitForSingleObject(h_handle: HANDLE, dw_milliseconds: u32) -> u32;
+    pub fn CloseHandle(h_object: HANDLE) -> BOOL;
+    pub fn SetUnhandledExceptionFilter(lp_top_level_exception_filter: *const c_void) -> *mut c_void;
 }
+
+pub type HANDLE = *mut c_void;
+pub const SYNCHRONIZE: u32 = 0x00100000;
+pub const INFINITE: u32 = 0xFFFFFFFF;
 
 #[link(name = "gdi32")]
 extern "system" {

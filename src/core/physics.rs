@@ -4,8 +4,8 @@
 use super::config::CursorConfig;
 use super::math::{compute_orientation_angle, compute_squash_and_stretch, Vec2};
 
-// Canonical resting angle (~ -118 degrees, top-left)
-pub const RESTING_ANGLE: f32 = -2.06;
+// Canonical resting angle (~ -135 degrees, pointing up-left like standard Windows cursor)
+pub const RESTING_ANGLE: f32 = -std::f32::consts::FRAC_PI_2 - std::f32::consts::FRAC_PI_4;
 
 /// Manages the second-order spring dynamics and smooth rotational trajectory.
 #[derive(Debug, Clone)]

@@ -3,7 +3,9 @@
 ; =====================================================================
 
 #define MyAppName "TinyCursor"
-#define MyAppVersion "0.1.0"
+#ifndef MyAppVersion
+  #define MyAppVersion "0.1.0"
+#endif
 #define MyAppPublisher "TinyCursor Team"
 #define MyAppURL "https://github.com"
 #define MyAppExeName "tiny-cursor.exe"

@@ -23,6 +23,22 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Determine Version
+        id: get_version
+        shell: pwsh
+        run: |
+          $raw = "${{ github.ref_name }}"
+          if ([string]::IsNullOrWhiteSpace($raw)) {
+            $raw = "${{ inputs.version }}"
+          }
+          if ([string]::IsNullOrWhiteSpace($raw)) {
+            $raw = "v0.1.0"
+          }
+          $clean = $raw -replace '^v',''
+          Write-Host "Determined Release Version: $raw (numeric: $clean)"
+          "raw=$raw" >> $env:GITHUB_OUTPUT
+          "clean=$clean" >> $env:GITHUB_OUTPUT
+
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
@@ -57,37 +73,72 @@ jobs:
       - name: Compile Inno Setup Installer
         shell: pwsh
         run: |
+          $ver = "${{ steps.get_version.outputs.clean }}"
+          Write-Host "Compiling Inno Setup installer for version: $ver"
           # iscc is pre-installed on windows-latest runners
-          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$ver" installer.iss
           if (-not (Test-Path "Output/TinyCursor-Setup-x64.exe")) {
             Write-Error "Installer binary not generated!"
             exit 1
           }
 
-      # Optional SignPath Foundation Signing (Active when repository secrets are provided)
-      - name: Submit Signing Request to SignPath (Installer)
-        if: ${{ env.SIGNPATH_API_TOKEN != '' }}
+      # SignPath Foundation Signing Integration
+      # Gracefully skipped if SignPath secrets are not yet configured
+      - name: Upload Unsigned Installer for SignPath
+        if: ${{ env.SIGNPATH_API_TOKEN != '' && env.SIGNPATH_ORGANIZATION_ID != '' }}
+        id: upload-unsigned-installer
         env:
           SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
-        uses: signpath/github-action-submit-signing-request@v1
+          SIGNPATH_ORGANIZATION_ID: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-installer
+          path: Output/TinyCursor-Setup-x64.exe
+
+      - name: Submit Signing Request to SignPath
+        if: ${{ env.SIGNPATH_API_TOKEN != '' && env.SIGNPATH_ORGANIZATION_ID != '' }}
+        env:
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+          SIGNPATH_ORGANIZATION_ID: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
+        uses: signpath/github-action-submit-signing-request@v2
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
           organization-id: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
           project-slug: ${{ secrets.SIGNPATH_PROJECT_SLUG }}
           signing-policy-slug: ${{ secrets.SIGNPATH_SIGNING_POLICY_SLUG }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          artifact-configuration-slug: 'installer'
-          parameters: |
-            input-artifact: Output/TinyCursor-Setup-x64.exe
+          github-artifact-id: ${{ steps.upload-unsigned-installer.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: 'signed'
+
+      - name: Replace Installer with Signed Binary
+        if: ${{ env.SIGNPATH_API_TOKEN != '' && env.SIGNPATH_ORGANIZATION_ID != '' }}
+        env:
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+          SIGNPATH_ORGANIZATION_ID: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
+        shell: pwsh
+        run: |
+          if (Test-Path "signed/TinyCursor-Setup-x64.exe") {
+            Copy-Item -Path "signed/TinyCursor-Setup-x64.exe" -Destination "Output/TinyCursor-Setup-x64.exe" -Force
+            Write-Host "Replaced unsigned installer with SignPath Authenticode-signed binary."
+          }
+
+      - name: Generate Checksums
+        shell: pwsh
+        run: |
+          Get-FileHash -Algorithm SHA256 Output/TinyCursor-Setup-x64.exe, TinyCursor-Portable-x64.zip |
+            ForEach-Object { "$($_.Hash)  $($_.Path | Split-Path -Leaf)" } |
+            Out-File -Encoding ascii SHA256SUMS.txt
+          Get-Content SHA256SUMS.txt
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name || inputs.version }}
-          name: TinyCursor ${{ github.ref_name || inputs.version }}
+          tag_name: ${{ steps.get_version.outputs.raw }}
+          name: TinyCursor ${{ steps.get_version.outputs.raw }}
           draft: false
           prerelease: false
           generate_release_notes: true
           files: |
             Output/TinyCursor-Setup-x64.exe
             TinyCursor-Portable-x64.zip
+            SHA256SUMS.txt

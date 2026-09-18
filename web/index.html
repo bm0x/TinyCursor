@@ -51,16 +51,53 @@
       <p class="hero-subtitle">
         Supercharge your mouse pointer with critically damped spring physics, adaptive light/dark contrast morphing, and zero-latency refresh rate pacing. Lightweight, non-intrusive, and completely open source.
       </p>
+
+      <!-- OS Recommendation Banner -->
+      <div id="os-recommendation-banner" class="os-banner">
+        <span class="os-banner-badge" id="os-badge">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
+          <span id="os-name-detected">Detected: Windows (64-bit)</span>
+        </span>
+        <span id="os-status-text">• Highest Z-Band & DirectComposition Verified</span>
+      </div>
+
+      <!-- Platform Selector Tabs -->
+      <div class="platform-tabs" role="tablist">
+        <button class="platform-tab active" data-platform="windows" role="tab">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
+          Windows <span class="tab-badge">Native</span>
+        </button>
+        <button class="platform-tab" data-platform="macos" role="tab">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.38c.62-.75 1.04-1.8 0.92-2.85-.9.04-2 .6-2.65 1.35-.58.67-1.09 1.74-.95 2.77 1.01.08 2.05-.52 2.68-1.27z"/></svg>
+          macOS <span class="tab-badge">WIP</span>
+        </button>
+        <button class="platform-tab" data-platform="linux" role="tab">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12.016 0C5.38 0 0 5.38 0 12.016c0 6.635 5.38 12.015 12.016 12.015 6.635 0 12.015-5.38 12.015-12.015C24.03 5.38 18.65 0 12.016 0zm-1.05 4.41c1.19-.04 2.12.75 2.37 1.95.25 1.2.04 2.54-.72 3.51-.55.71-1.35 1.15-2.25 1.19-.9.04-1.78-.32-2.39-1.01-.61-.69-.87-1.63-.73-2.54.14-.91.73-1.69 1.54-2.11.36-.18.77-.28 1.18-.29z"/></svg>
+          Linux <span class="tab-badge">WIP</span>
+        </button>
+      </div>
+
       <div class="hero-actions">
-        <a href="https://github.com/bm0x/TinyCursor/releases/latest" class="btn btn-primary">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-          Download for Windows (.exe)
+        <a id="hero-primary-download" href="https://github.com/bm0x/TinyCursor/releases/latest" class="btn btn-primary">
+          <span id="hero-download-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          </span>
+          <span id="hero-download-text">Download for Windows (.exe)</span>
         </a>
-        <a href="https://github.com/bm0x/TinyCursor" class="btn btn-secondary">
+        <a id="hero-secondary-download" href="https://github.com/bm0x/TinyCursor/releases/latest" class="btn btn-secondary">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+          <span id="hero-secondary-text">Portable (.zip)</span>
+        </a>
+        <a href="https://github.com/bm0x/TinyCursor" class="btn btn-outline" target="_blank" rel="noopener noreferrer">
           Source Code (MIT)
         </a>
       </div>
-      <p class="hero-meta">Version 0.1.0 • Windows 10/11 (64-bit) • macOS & Linux in development</p>
+      <p class="hero-meta" id="hero-meta">
+        <span id="release-tag-display">Version v0.1.0</span> •
+        <span id="release-os-spec">Windows 10/11 (64-bit)</span> •
+        <a href="https://github.com/bm0x/TinyCursor/releases" target="_blank" rel="noopener noreferrer">Changelog</a> •
+        <span id="release-signature-display">Authenticode Signed</span>
+      </p>
 
       <!-- Hero Preview Card -->
       <div class="hero-preview-card">
@@ -80,7 +117,27 @@
       <div class="section-header">
         <span class="section-tag">Live Playground</span>
         <h2>Move Your Mouse Across the Screen</h2>
-        <p>The smooth spring physics follows your real pointer everywhere. Test how it adapts to light vs. dark surfaces and interactive elements below.</p>
+        <p>The smooth spring physics follows your pointer with real-time Euler integration, shortest-arc rotation, and dynamic squash & stretch. Feel the physics below.</p>
+      </div>
+
+      <!-- Playground Toolbar -->
+      <div class="playground-toolbar">
+        <div class="toolbar-item">
+          <span class="toolbar-label">Physics Preset:</span>
+          <div class="preset-group">
+            <button class="btn-preset active" data-preset="balanced">Balanced (520k)</button>
+            <button class="btn-preset" data-preset="snappy">Snappy (880k)</button>
+            <button class="btn-preset" data-preset="floaty">Floaty (280k)</button>
+          </div>
+        </div>
+        <div class="toolbar-item">
+          <span class="toolbar-label">Theme Mode:</span>
+          <div class="preset-group">
+            <button class="btn-preset active" data-theme="auto">Auto Contrast</button>
+            <button class="btn-preset" data-theme="white">Always White</button>
+            <button class="btn-preset" data-theme="black">Always Black</button>
+          </div>
+        </div>
       </div>
 
       <div class="playground-grid">
@@ -91,7 +148,7 @@
             <span class="card-status">Morphs to Obsidian Black</span>
           </div>
           <p class="test-desc">When hovering over this bright card, TinyCursor dynamically morphs into high-contrast black.</p>
-          <button class="test-btn btn-light-theme">Hover this button</button>
+          <button class="test-btn btn-light-theme">Hover to morph to Hand Pointer</button>
         </div>
 
         <!-- Dark Surface Card -->
@@ -101,7 +158,24 @@
             <span class="card-status">Morphs to Arctic White</span>
           </div>
           <p class="test-desc">Over deep obsidian surfaces, the pointer transitions seamlessly into crisp Arctic White.</p>
-          <button class="test-btn btn-dark-theme">Click to test squash</button>
+          <button class="test-btn btn-dark-theme">Click to test spring squash</button>
+          <input type="text" class="test-input" placeholder="Hover or focus here to test the Text I-Beam pointer...">
+        </div>
+      </div>
+
+      <!-- Interactive Cursor Variant Showcase -->
+      <div class="cursor-variants-strip">
+        <span class="strip-label">Live Pointer Tester:</span>
+        <div class="chips-container">
+          <button class="chip" data-cursor="arrow">Default Arrow</button>
+          <button class="chip" data-cursor="hand">Hand Link</button>
+          <button class="chip" data-cursor="ibeam">Text I-Beam</button>
+          <button class="chip" data-cursor="crosshair">Precision Crosshair</button>
+          <button class="chip" data-cursor="move">4-Axis Move</button>
+          <button class="chip" data-cursor="resize-we">Horizontal Resize</button>
+          <button class="chip" data-cursor="resize-ns">Vertical Resize</button>
+          <button class="chip" data-cursor="help">Context Help</button>
+          <button class="chip" data-cursor="wait">Wait / Busy</button>
         </div>
       </div>
 
@@ -120,8 +194,20 @@
           <span class="metric-value" id="hud-speed">0 px/s</span>
         </div>
         <div class="metric-item">
+          <span class="metric-label">Rotation Angle</span>
+          <span class="metric-value" id="hud-angle">0.0°</span>
+        </div>
+        <div class="metric-item">
+          <span class="metric-label">Squash & Stretch</span>
+          <span class="metric-value" id="hud-scale">1.00x</span>
+        </div>
+        <div class="metric-item">
           <span class="metric-label">Active State</span>
           <span class="metric-value" id="hud-state">Arrow (White)</span>
+        </div>
+        <div class="metric-item">
+          <span class="metric-label">Frame Pacing</span>
+          <span class="metric-value" id="hud-fps">~60 FPS</span>
         </div>
       </div>
     </div>
@@ -187,7 +273,15 @@
       <div class="gallery-card">
         <img src="assets/clean_sheet.png" alt="TinyCursor 14 Dual-Theme Sprite Sheet" class="sheet-img">
         <div class="gallery-labels">
-          <span>Arrow</span> • <span>Hand Pointer</span> • <span>Text I-Beam</span> • <span>Move</span> • <span>Resize 4-Axis</span> • <span>Zoom In / Out</span> • <span>Help</span> • <span>Crosshair</span> • <span>Wait</span>
+          <span class="interactive-pill" data-cursor="arrow">Arrow</span>
+          <span class="interactive-pill" data-cursor="hand">Hand Pointer</span>
+          <span class="interactive-pill" data-cursor="ibeam">Text I-Beam</span>
+          <span class="interactive-pill" data-cursor="crosshair">Crosshair</span>
+          <span class="interactive-pill" data-cursor="move">Move</span>
+          <span class="interactive-pill" data-cursor="resize-we">Horizontal Resize</span>
+          <span class="interactive-pill" data-cursor="resize-ns">Vertical Resize</span>
+          <span class="interactive-pill" data-cursor="help">Help</span>
+          <span class="interactive-pill" data-cursor="wait">Wait</span>
         </div>
       </div>
     </div>

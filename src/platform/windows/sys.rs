@@ -272,6 +272,7 @@ extern "system" {
         pblend: *const BLENDFUNCTION,
         dw_flags: u32,
     ) -> BOOL;
+    pub fn SetLayeredWindowAttributes(h_wnd: HWND, cr_key: u32, b_alpha: u8, dw_flags: u32) -> BOOL;
     pub fn SetWindowPos(
         h_wnd: HWND,
         h_wnd_insert_after: HWND,
@@ -371,6 +372,8 @@ pub const VREFRESH: i32 = 116;
 pub const SMTO_ABORTIFHUNG: u32 = 0x0002;
 pub const CURSOR_SHOWING: u32 = 0x00000001;
 pub const CURSOR_SUPPRESSED: u32 = 0x00000002;
+pub const LWA_COLORKEY: u32 = 0x00000001;
+pub const LWA_ALPHA: u32 = 0x00000002;
 
 #[repr(C)]
 #[derive(Clone, Copy, Default)]

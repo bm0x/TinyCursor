@@ -21,6 +21,7 @@ use windows::{
     Win32::Graphics::Dxgi::*,
     Win32::Graphics::Dxgi::Common::*,
     Win32::System::Performance::*,
+    Win32::System::Threading::*,
     Win32::UI::WindowsAndMessaging::*,
 };
 
@@ -73,6 +74,7 @@ pub struct DxgiPipeline {
     offset_y: f32,
     animation_time: f32,
     frame_counter: u64,
+    waitable_object: HANDLE,
 }
 
 impl DxgiPipeline {
@@ -126,10 +128,16 @@ impl DxgiPipeline {
                 Scaling: DXGI_SCALING_STRETCH,
                 SwapEffect: DXGI_SWAP_EFFECT_FLIP_DISCARD,
                 AlphaMode: DXGI_ALPHA_MODE_PREMULTIPLIED,
-                Flags: 0,
+                Flags: DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT.0 as u32,
             };
 
             let swap_chain = dxgi_factory.CreateSwapChainForComposition(&device, &swap_chain_desc, None)?;
+            let waitable_object = if let Ok(swap_chain2) = swap_chain.cast::<IDXGISwapChain2>() {
+                let _ = swap_chain2.SetMaximumFrameLatency(1);
+                swap_chain2.GetFrameLatencyWaitableObject()
+            } else {
+                HANDLE(std::ptr::null_mut())
+            };
 
             let dcomp_device: IDCompositionDevice = DCompositionCreateDevice(Some(&dxgi_device))?;
             let dcomp_target = dcomp_device.CreateTargetForHwnd(hwnd, true)?;
@@ -208,6 +216,7 @@ impl DxgiPipeline {
                 offset_y: vy as f32,
                 animation_time: 0.0,
                 frame_counter: 0,
+                waitable_object,
             })
         }
     }
@@ -225,13 +234,19 @@ impl DxgiPipeline {
         is_clicking: bool,
     ) -> Result<()> {
         unsafe {
+            // 0. Ultra-low latency synchronization via DXGI waitable object (1-frame queue)
+            // Synchronizes directly with physical monitor VBLANK (144 Hz = 6.94ms, 240 Hz = 4.16ms, 360 Hz = 2.77ms)
+            if !self.waitable_object.is_invalid() {
+                let _ = WaitForSingleObject(self.waitable_object, 1000);
+            }
+
             // 1. Precise QPC delta calculation
             let mut current_counter = 0i64;
             QueryPerformanceCounter(&mut current_counter)?;
             let mut delta_time = (current_counter - self.prev_counter) as f32 / self.perf_freq as f32;
             self.prev_counter = current_counter;
 
-            // Clamp delta on pauses or lag spikes
+            // Clamp delta on abnormal pauses or lag spikes (default to 144Hz fallback dt)
             if delta_time <= 0.0 || delta_time > 0.05 {
                 delta_time = 1.0 / 144.0;
             }

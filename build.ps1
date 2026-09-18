@@ -37,7 +37,7 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "  -> Todas las pruebas unitarias pasaron con exito.`n" -ForegroundColor Green
 
 # 3. Compilar en Modo Release con Manifest UIAccess y Linker rust-lld
-Write-Host "[Paso 2/3] Compilando binario Release optimizado en Rust con UIAccess..." -ForegroundColor Cyan
+Write-Host "[Paso 2/3] Compilando binario Release optimizado en Rust..." -ForegroundColor Cyan
 
 # Asegurar manifest.res
 $makeResScript = Join-Path $PSScriptRoot "tools\make_res.py"
@@ -47,6 +47,7 @@ if (Test-Path $makeResScript) {
 
 $exePath = Join-Path $PSScriptRoot "target\release\tiny-cursor.exe"
 Remove-Item -Path $exePath -Force -ErrorAction SilentlyContinue
+Remove-Item -Path (Join-Path $PSScriptRoot "target\release\deps\tiny_cursor*") -Force -ErrorAction SilentlyContinue
 
 & $cargoPath rustc --release -- -C linker=rust-lld -C link-arg="manifest.res"
 if ($LASTEXITCODE -ne 0) {

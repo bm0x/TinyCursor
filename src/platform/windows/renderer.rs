@@ -428,23 +428,25 @@ impl CursorSurface {
 
     /// Commits the rendered sprite to DWM and reinforces HWND_TOPMOST priority
     /// so the cursor stays above the Windows taskbar, start menu, and notifications.
-    pub fn present(&self, hwnd: HWND, visual_pos: Vec2) {
+    pub fn present(&self, hwnd: HWND, visual_pos: Vec2, is_in_band: bool) {
         let dst_point = POINT {
             x: (visual_pos.x - ANCHOR) as i32,
             y: (visual_pos.y - ANCHOR) as i32,
         };
 
         unsafe {
-            // Continuously reinforce topmost Z-order without fighting UpdateLayeredWindow's coordinates
-            SetWindowPos(
-                hwnd,
-                HWND_TOPMOST,
-                0,
-                0,
-                0,
-                0,
-                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_SHOWWINDOW,
-            );
+            if !is_in_band {
+                // Continuously reinforce topmost Z-order without fighting UpdateLayeredWindow's coordinates
+                SetWindowPos(
+                    hwnd,
+                    HWND_TOPMOST,
+                    0,
+                    0,
+                    0,
+                    0,
+                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_SHOWWINDOW,
+                );
+            }
 
             UpdateLayeredWindow(
                 hwnd,

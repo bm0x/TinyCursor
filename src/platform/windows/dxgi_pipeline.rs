@@ -75,11 +75,19 @@ pub struct DxgiPipeline {
     animation_time: f32,
     frame_counter: u64,
     waitable_object: HANDLE,
+    is_in_band: bool,
 }
 
 impl DxgiPipeline {
     /// Creates and initializes the complete DirectX 11 / DirectComposition / Direct2D pipeline.
-    pub fn new(hwnd_raw: *mut std::ffi::c_void, vx: i32, vy: i32, width: u32, height: u32) -> Result<Self> {
+    pub fn new(
+        hwnd_raw: *mut std::ffi::c_void,
+        vx: i32,
+        vy: i32,
+        width: u32,
+        height: u32,
+        is_in_band: bool,
+    ) -> Result<Self> {
         let hwnd = HWND(hwnd_raw as _);
         unsafe {
             let mut perf_freq = 0i64;
@@ -217,6 +225,7 @@ impl DxgiPipeline {
                 animation_time: 0.0,
                 frame_counter: 0,
                 waitable_object,
+                is_in_band,
             })
         }
     }
@@ -256,7 +265,9 @@ impl DxgiPipeline {
             physics.update(target_pos, delta_time);
 
             // 3. Reinforce HWND_TOPMOST priority periodically over Taskbar and Shell
-            if self.frame_counter % 120 == 0 {
+            // Strictly omitted when hosted in an elevated Z-Band (ZBID_SYSTEM_TOOLS / ZBID_UIACCESS)
+            // to prevent DWM band locks and ensure 100% transparent click routing.
+            if !self.is_in_band && self.frame_counter % 120 == 0 {
                 let _ = SetWindowPos(
                     self.hwnd,
                     HWND_TOPMOST,

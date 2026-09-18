@@ -99,7 +99,8 @@ fn run_windows() {
     // 5. Attempt Modern DXGI Flip Model + DirectComposition Hardware Pipeline
     // Hardware VBLANK synchronized Present(1, 0) with ZERO Thread::sleep in render loop
     if let Some((overlay, vx, vy, vw, vh)) = OverlayWindow::new_direct_composition() {
-        if let Ok(pipeline) = DxgiPipeline::new(overlay.hwnd(), vx, vy, vw, vh) {
+        let is_in_band = overlay.is_in_band();
+        if let Ok(pipeline) = DxgiPipeline::new(overlay.hwnd(), vx, vy, vw, vh, is_in_band) {
             run_dxgi_loop(
                 overlay,
                 pipeline,
@@ -286,6 +287,7 @@ fn run_gdi_loop(
     mut target_color_blend: f32,
     initial_pos: crate::core::math::Vec2,
 ) {
+    let is_in_band = overlay.is_in_band();
     surface.render_modern_cursor(
         RenderCursorKind::Arrow,
         physics.angle,
@@ -295,7 +297,7 @@ fn run_gdi_loop(
         color_theme_blend,
         &physics.config,
     );
-    surface.present(overlay.hwnd(), physics.position);
+    surface.present(overlay.hwnd(), physics.position, is_in_band);
 
     let mut last_frame_time = Instant::now();
     let mut last_lum_sample_time = Instant::now();
@@ -321,7 +323,7 @@ fn run_gdi_loop(
                 cursor_guard = None;
                 restore_system_cursors();
                 surface.clear();
-                surface.present(overlay.hwnd(), physics.position);
+                surface.present(overlay.hwnd(), physics.position, is_in_band);
             } else {
                 // Re-enable smooth cursor
                 cursor_guard = SystemCursorGuard::hide();
@@ -419,7 +421,7 @@ fn run_gdi_loop(
             color_theme_blend,
             &physics.config,
         );
-        surface.present(overlay.hwnd(), physics.position);
+        surface.present(overlay.hwnd(), physics.position, is_in_band);
 
         // L. High-precision low-latency frame pacing for true real-time responsiveness
         let is_color_settled = (color_theme_blend - target_color_blend).abs() < 0.002;

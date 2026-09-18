@@ -10,14 +10,12 @@ use super::sys::{
     GetProcAddress, HMENU, HINSTANCE, PeekMessageW, RegisterClassExW, SetProcessDpiAwarenessContext,
     SetWindowPos, ShowWindow, TranslateMessage, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, HWND,
     HWND_TOPMOST, LPARAM, LRESULT, MSG, PM_REMOVE, SW_SHOW, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
-    SWP_NOOWNERZORDER, SWP_SHOWWINDOW, WNDCLASSEXW, WM_QUIT, WPARAM,
+    SWP_NOOWNERZORDER, SWP_NOZORDER, SWP_SHOWWINDOW, WNDCLASSEXW, WM_QUIT, WPARAM,
     WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_NOREDIRECTIONBITMAP, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
     WS_EX_TRANSPARENT, WS_POPUP, GetSystemMetrics, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN,
     SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN, HTTRANSPARENT, MA_NOACTIVATE, WM_DESTROY,
-    WM_MOUSEACTIVATE, WM_NCHITTEST, SetLayeredWindowAttributes, LWA_ALPHA,
+    WM_ERASEBKGND, WM_MOUSEACTIVATE, WM_NCHITTEST, WM_SETCURSOR, SetLayeredWindowAttributes, LWA_ALPHA,
 };
-
-
 
 const WINDOW_CLASS_NAME: &[u16] = &[
     b'T' as u16, b'i' as u16, b'n' as u16, b'y' as u16,
@@ -40,6 +38,10 @@ unsafe extern "system" fn window_proc(
         WM_NCHITTEST => HTTRANSPARENT,
         // MA_NOACTIVATE (3) ensures clicks never steal focus or activate the overlay.
         WM_MOUSEACTIVATE => MA_NOACTIVATE,
+        // Ensure cursor is never overridden by class cursor
+        WM_SETCURSOR => 0,
+        // Prevent background erase flickers
+        WM_ERASEBKGND => 1,
         WM_DESTROY => {
             super::sys::PostQuitMessage(0);
             0
@@ -50,10 +52,21 @@ unsafe extern "system" fn window_proc(
 
 pub const ZBID_DEFAULT: u32 = 0;
 pub const ZBID_DESKTOP: u32 = 1;
-pub const ZBID_UIACCESS: u32 = 12;
-pub const ZBID_IMMERSIVE_NOTIFICATION: u32 = 6;
-pub const ZBID_IMMERSIVE_ACTIVEMOBODY: u32 = 8;
-pub const ZBID_SYSTEM_TOOLS: u32 = 11;
+pub const ZBID_UIACCESS: u32 = 2;
+pub const ZBID_IMMERSIVE_IHM: u32 = 3;
+pub const ZBID_IMMERSIVE_NOTIFICATION: u32 = 4;
+pub const ZBID_IMMERSIVE_APPCHROME: u32 = 5;
+pub const ZBID_IMMERSIVE_MOGO: u32 = 6;
+pub const ZBID_IMMERSIVE_EDGY: u32 = 7;
+pub const ZBID_IMMERSIVE_INACTIVEMOBODY: u32 = 8;
+pub const ZBID_IMMERSIVE_INACTIVEDOCK: u32 = 9;
+pub const ZBID_IMMERSIVE_ACTIVEMOBODY: u32 = 10;
+pub const ZBID_IMMERSIVE_ACTIVEDOCK: u32 = 11;
+pub const ZBID_IMMERSIVE_BACKGROUND: u32 = 12;
+pub const ZBID_IMMERSIVE_SEARCH: u32 = 13;
+pub const ZBID_GENUINE_WINDOWS: u32 = 14;
+pub const ZBID_IMMERSIVE_RESTRICTED: u32 = 15;
+pub const ZBID_SYSTEM_TOOLS: u32 = 16;
 
 type PfnCreateWindowInBand = unsafe extern "system" fn(
     u32,
@@ -71,8 +84,6 @@ type PfnCreateWindowInBand = unsafe extern "system" fn(
     u32,
 ) -> HWND;
 
-type PfnSetWindowBand = unsafe extern "system" fn(HWND, HWND, u32) -> super::sys::BOOL;
-
 /// A native Windows transparent overlay window.
 pub struct OverlayWindow {
     hwnd: HWND,
@@ -81,7 +92,7 @@ pub struct OverlayWindow {
 
 impl OverlayWindow {
     /// Creates and initializes the transparent overlay window.
-    /// Dual-Tier Architecture: Attempts elevated Z-Bands (ZBID_UIACCESS / ZBID_SYSTEM_TOOLS)
+    /// Dual-Tier Architecture: Attempts elevated Z-Bands (ZBID_SYSTEM_TOOLS = 16 / ZBID_UIACCESS = 2)
     /// with graceful, seamless fallback to standard Desktop Topmost.
     pub fn new() -> Option<Self> {
         unsafe {
@@ -109,25 +120,20 @@ impl OverlayWindow {
             ];
             let user32_mod = GetModuleHandleW(user32_name.as_ptr());
             let mut p_create_in_band: Option<PfnCreateWindowInBand> = None;
-            let mut p_set_window_band: Option<PfnSetWindowBand> = None;
 
             if !user32_mod.is_null() {
                 let p_create = GetProcAddress(user32_mod, b"CreateWindowInBand\0".as_ptr());
                 if !p_create.is_null() {
                     p_create_in_band = Some(std::mem::transmute(p_create));
                 }
-                let p_set = GetProcAddress(user32_mod, b"SetWindowBand\0".as_ptr());
-                if !p_set.is_null() {
-                    p_set_window_band = Some(std::mem::transmute(p_set));
-                }
             }
 
             let mut hwnd: HWND = null_mut();
             let mut is_in_band = false;
 
-            // Tier 1: Try elevated Z-Bands (ZBID_UIACCESS = 12, ZBID_SYSTEM_TOOLS = 11)
+            // Tier 1: Try elevated Z-Bands (ZBID_SYSTEM_TOOLS = 16, ZBID_UIACCESS = 2, ZBID_IMMERSIVE_NOTIFICATION = 4)
             if let Some(create_in_band) = p_create_in_band {
-                for &target_band in &[ZBID_UIACCESS, ZBID_SYSTEM_TOOLS, ZBID_IMMERSIVE_NOTIFICATION] {
+                for &target_band in &[ZBID_SYSTEM_TOOLS, ZBID_UIACCESS, ZBID_IMMERSIVE_NOTIFICATION] {
                     hwnd = create_in_band(
                         ex_style,
                         WINDOW_CLASS_NAME.as_ptr(),
@@ -145,9 +151,6 @@ impl OverlayWindow {
                     );
                     if !hwnd.is_null() {
                         is_in_band = true;
-                        if let Some(set_band) = p_set_window_band {
-                            let _ = set_band(hwnd, null_mut(), target_band);
-                        }
                         break;
                     }
                 }
@@ -177,15 +180,27 @@ impl OverlayWindow {
 
             SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA);
             ShowWindow(hwnd, SW_SHOW);
-            SetWindowPos(
-                hwnd,
-                HWND_TOPMOST,
-                0,
-                0,
-                0,
-                0,
-                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW,
-            );
+            if is_in_band {
+                SetWindowPos(
+                    hwnd,
+                    null_mut(),
+                    0,
+                    0,
+                    0,
+                    0,
+                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW,
+                );
+            } else {
+                SetWindowPos(
+                    hwnd,
+                    HWND_TOPMOST,
+                    0,
+                    0,
+                    0,
+                    0,
+                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW,
+                );
+            }
 
             Some(Self { hwnd, is_in_band })
         }
@@ -233,25 +248,20 @@ impl OverlayWindow {
             ];
             let user32_mod = GetModuleHandleW(user32_name.as_ptr());
             let mut p_create_in_band: Option<PfnCreateWindowInBand> = None;
-            let mut p_set_window_band: Option<PfnSetWindowBand> = None;
 
             if !user32_mod.is_null() {
                 let p_create = GetProcAddress(user32_mod, b"CreateWindowInBand\0".as_ptr());
                 if !p_create.is_null() {
                     p_create_in_band = Some(std::mem::transmute(p_create));
                 }
-                let p_set = GetProcAddress(user32_mod, b"SetWindowBand\0".as_ptr());
-                if !p_set.is_null() {
-                    p_set_window_band = Some(std::mem::transmute(p_set));
-                }
             }
 
             let mut hwnd: HWND = null_mut();
             let mut is_in_band = false;
 
-            // Tier 1: Try elevated Z-Bands (ZBID_UIACCESS = 12, ZBID_SYSTEM_TOOLS = 11)
+            // Tier 1: Try elevated Z-Bands (ZBID_SYSTEM_TOOLS = 16, ZBID_UIACCESS = 2, ZBID_IMMERSIVE_NOTIFICATION = 4)
             if let Some(create_in_band) = p_create_in_band {
-                for &target_band in &[ZBID_UIACCESS, ZBID_SYSTEM_TOOLS, ZBID_IMMERSIVE_NOTIFICATION] {
+                for &target_band in &[ZBID_SYSTEM_TOOLS, ZBID_UIACCESS, ZBID_IMMERSIVE_NOTIFICATION] {
                     hwnd = create_in_band(
                         ex_style,
                         WINDOW_CLASS_NAME.as_ptr(),
@@ -269,9 +279,6 @@ impl OverlayWindow {
                     );
                     if !hwnd.is_null() {
                         is_in_band = true;
-                        if let Some(set_band) = p_set_window_band {
-                            let _ = set_band(hwnd, null_mut(), target_band);
-                        }
                         break;
                     }
                 }
@@ -304,15 +311,28 @@ impl OverlayWindow {
             SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA);
 
             ShowWindow(hwnd, SW_SHOW);
-            SetWindowPos(
-                hwnd,
-                HWND_TOPMOST,
-                vx,
-                vy,
-                vw as i32,
-                vh as i32,
-                SWP_NOACTIVATE | SWP_SHOWWINDOW,
-            );
+            if is_in_band {
+                // If in elevated Z-Band, SWP_NOZORDER preserves band placement and prevents DWM band locks
+                SetWindowPos(
+                    hwnd,
+                    null_mut(),
+                    vx,
+                    vy,
+                    vw as i32,
+                    vh as i32,
+                    SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW,
+                );
+            } else {
+                SetWindowPos(
+                    hwnd,
+                    HWND_TOPMOST,
+                    vx,
+                    vy,
+                    vw as i32,
+                    vh as i32,
+                    SWP_NOACTIVATE | SWP_SHOWWINDOW,
+                );
+            }
 
             Some((Self { hwnd, is_in_band }, vx, vy, vw, vh))
         }
@@ -332,10 +352,11 @@ impl OverlayWindow {
 
     /// Continuously reinforces HWND_TOPMOST priority so the cursor stays above
     /// the Windows Taskbar, Start Menu, and all full-screen or foreground windows.
+    /// Strictly bypassed when window is in an elevated Z-Band to prevent input locks.
     #[inline]
     pub fn reinforce_topmost(&self) {
         unsafe {
-            if !self.hwnd.is_null() {
+            if !self.hwnd.is_null() && !self.is_in_band {
                 SetWindowPos(
                     self.hwnd,
                     HWND_TOPMOST,

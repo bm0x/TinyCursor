@@ -96,18 +96,28 @@ impl SmoothCursorPhysics {
             self.scale_x += (1.0 - self.scale_x) * (1.0 - (-12.0 * dt).exp());
             self.scale_y = 1.0 / self.scale_x.sqrt();
 
-            // Do NOT reset orientation: retain exact angle from the last interaction
-            self.is_settled = true;
+            // Smoothly relax orientation to canonical resting pose (pointing up-left)
+            let angle_diff = (RESTING_ANGLE - self.angle + std::f32::consts::PI)
+                .rem_euclid(2.0 * std::f32::consts::PI) - std::f32::consts::PI;
+            if angle_diff.abs() > 0.005 {
+                self.angle += angle_diff * (1.0 - (-14.0 * dt).exp());
+                self.is_settled = false;
+            } else {
+                self.angle = RESTING_ANGLE;
+                self.is_settled = true;
+            }
             return;
         }
 
         self.is_settled = false;
 
         // 1. Target orientation angle based on velocity
-        let target_angle = if speed > self.config.min_rotation_speed {
-            self.velocity.y.atan2(self.velocity.x)
+        // When moving, the arrow points along velocity vector.
+        // When slowing down below threshold, it fluidly recovers towards canonical resting angle.
+        let (target_angle, angular_speed) = if speed > self.config.min_rotation_speed {
+            (self.velocity.y.atan2(self.velocity.x), 24.0 + (speed / 300.0).min(16.0))
         } else {
-            self.angle
+            (RESTING_ANGLE, 12.0)
         };
 
         // 2. Shortest-arc angular interpolation (Slerp)
@@ -115,8 +125,6 @@ impl SmoothCursorPhysics {
         let angle_diff = (target_angle - self.angle + std::f32::consts::PI)
             .rem_euclid(2.0 * std::f32::consts::PI) - std::f32::consts::PI;
 
-        // Dynamic angular response: rotates faster at high speed, smoother at low speed
-        let angular_speed = 24.0 + (speed / 300.0).min(16.0);
         let angular_blend = (1.0 - (-angular_speed * dt).exp()).clamp(0.0, 1.0);
         self.angle += angle_diff * angular_blend;
 

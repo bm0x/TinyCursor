@@ -18,7 +18,7 @@ EndUpdateResourceW = k32.EndUpdateResourceW
 EndUpdateResourceW.restype = wintypes.BOOL
 EndUpdateResourceW.argtypes = [wintypes.HANDLE, wintypes.BOOL]
 
-def embed_manifest(exe_path, ui_access=False):
+def embed_manifest(exe_path, ui_access=True):
     ui_str = "true" if ui_access else "false"
     manifest_xml = f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
